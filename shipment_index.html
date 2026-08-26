@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>로켓택배 발주서 자동화</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- 조건부 서식까지 참고용 파일과 동일하게 내보내기 위해 사용 -->
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<style>
+  :root{
+    --bg:#0c1116;
+    --panel:#141b23;
+    --panel2:#1a232d;
+    --line:#26323d;
+    --text:#e7edf2;
+    --sub:#8ea2b4;
+    --amber:#ffb020;
+    --amber-dim:#7a5a1c;
+    --ok:#3ecf8e;
+    --warn:#ff5d5d;
+    --mono:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;
+    --sans:-apple-system,'Apple SD Gothic Neo','Malgun Gothic','Segoe UI',sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text); font-family:var(--sans);
+    line-height:1.5; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1180px; margin:0 auto; padding:28px 20px 80px;}
+
+  .tag{
+    display:inline-flex; align-items:center; gap:6px; font-family:var(--mono);
+    font-size:11px; letter-spacing:.08em; color:var(--amber); border:1px solid var(--amber-dim);
+    background:rgba(255,176,32,.08); padding:3px 9px; border-radius:3px; text-transform:uppercase;
+  }
+  h1{font-size:22px; margin:14px 0 4px; letter-spacing:-.01em;}
+  .sub{color:var(--sub); font-size:13.5px; margin:0 0 26px;}
+
+  .panel{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:20px 22px; margin-bottom:18px;
+  }
+  .panel-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; flex-wrap:wrap; gap:8px;}
+  .panel-title{display:flex; align-items:center; gap:10px; font-size:15px; font-weight:600;}
+  
+  .step-no{
+    width:22px; height:22px; border-radius:5px; background:var(--panel2); border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:12px; color:var(--amber);
+    flex-shrink:0;
+  }
+  .panel-desc{color:var(--sub); font-size:12.5px; margin:0 0 14px;}
+
+  .drop{
+    border:1.5px dashed var(--line); border-radius:8px; padding:22px; text-align:center;
+    cursor:pointer; transition:.15s; background:var(--panel2);
+  }
+  .drop:hover, .drop.drag{border-color:var(--amber); background:rgba(255,176,32,.06);}
+  .drop .ic{font-size:22px; margin-bottom:6px; opacity:.7;}
+  .drop .t1{font-size:13.5px; font-weight:600;}
+  .drop .t2{font-size:11.5px; color:var(--sub); margin-top:3px; font-family:var(--mono);}
+  
+  /* STEP 2 PO 업로드 영역 시각적 강조 */
+  #dropPo {
+    border: 2px dashed var(--amber);
+    background: rgba(255,176,32,.06);
+    padding: 32px 22px;
+  }
+  #dropPo:hover, #dropPo.drag {
+    background: rgba(255,176,32,.12);
+  }
+  #dropPo .ic { font-size: 28px; color: var(--amber); opacity: 1; }
+  #dropPo .t1 { font-size: 15px; color: var(--amber); }
+
+  input[type=file]{display:none;}
+
+  .btn{
+    background:var(--amber); color:#1a1204; border:none; font-weight:700; font-size:13px;
+    padding:10px 18px; border-radius:6px; cursor:pointer; font-family:var(--sans);
+    transition:.12s; letter-spacing:-.01em;
+  }
+  .btn:hover{filter:brightness(1.08);}
+  .btn:disabled{background:#3a4048; color:#6b7480; cursor:not-allowed;}
+  .btn.ghost{background:transparent; border:1px solid var(--line); color:var(--text);}
+  .btn.ghost:hover{border-color:var(--amber); color:var(--amber);}
+  .btn.sm{padding:6px 12px; font-size:12px;}
+  
+  /* 다운로드 버튼 크기/두께 강조 */
+  #btnDownload {
+    font-size: 16px;
+    padding: 14px 26px;
+    box-shadow: 0 4px 15px rgba(255,176,32,0.25);
+  }
+
+  .kv{display:flex; flex-wrap:wrap; gap:10px; margin-top:12px;}
+  .kv .cell{
+    flex:1; min-width:130px; background:var(--panel2); border:1px solid var(--line);
+    border-radius:7px; padding:10px 12px;
+  }
+  .kv .cell .n{font-family:var(--mono); font-size:19px; color:var(--amber); font-weight:700;}
+  .kv .cell .l{font-size:11px; color:var(--sub); margin-top:2px;}
+
+  .status-row{display:flex; align-items:center; gap:8px; font-size:12.5px; margin-top:10px; color:var(--sub);}
+  .dot{width:7px; height:7px; border-radius:50%; background:var(--line);}
+  .dot.on{background:var(--ok); box-shadow:0 0 0 3px rgba(62,207,142,.15);}
+
+  table{width:100%; border-collapse:collapse; font-size:12.2px;}
+  th,td{padding:7px 8px; border-bottom:1px solid var(--line); text-align:left; white-space:nowrap;}
+  th{color:var(--sub); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.03em; position:sticky; top:0; background:var(--panel);}
+  tr.new-group td{border-top:2px solid #3a4552;}
+  tr.over-limit{background:rgba(255,93,93,.09);}
+  tr.over-limit td:first-child{box-shadow:inset 3px 0 0 var(--warn);}
+  .tbl-wrap{max-height:480px; overflow:auto; border:1px solid var(--line); border-radius:8px; margin-top:12px;}
+  .center-label{font-family:var(--mono); font-weight:700;}
+  .pill{
+    display:inline-block; font-family:var(--mono); font-size:10.5px; padding:1px 6px; border-radius:3px;
+    background:rgba(255,93,93,.15); color:var(--warn); border:1px solid rgba(255,93,93,.4); margin-left:6px;
+  }
+  .miss{color:var(--warn);}
+
+  .warn-box{
+    border:1px solid rgba(255,93,93,.35); background:rgba(255,93,93,.07); border-radius:8px;
+    padding:12px 14px; font-size:12.5px; margin-top:12px;
+  }
+  .warn-box .h{color:var(--warn); font-weight:700; margin-bottom:6px;}
+  .warn-box ul{margin:0; padding-left:18px;}
+  .warn-box li{margin-bottom:3px;}
+
+  .footer-actions{display:flex; gap:10px; align-items:center; margin-top:16px; flex-wrap:wrap;}
+  .filename{font-family:var(--mono); font-size:12px; color:var(--sub);}
+
+  .locked{opacity:.4; pointer-events:none;}
+  ::-webkit-scrollbar{height:8px; width:8px;}
+  ::-webkit-scrollbar-thumb{background:var(--line); border-radius:4px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <span class="tag">● Coupang Rocket 택배</span>
+  <h1>로켓택배 발주서 자동화</h1>
+  <p class="sub">쿠팡에서 다운받은 PO_SKU_LIST 파일 하나만 올리면, VLOOKUP 매칭 → 박스 분리 → 물류센터 라벨링 → 9박스 초과 표시까지 자동으로 처리해서 참고용 엑셀 파일을 만들어 드립니다.</p>
+
+  <!-- STEP 1: 마스터 데이터 -->
+  <div class="panel">
+    <div class="panel-head">
+      <div class="panel-title"><span class="step-no">1</span>마스터 데이터 (상품·센터 정보 / 포장정보)</div>
+      <button class="btn ghost sm" id="btnClearMaster">초기화</button>
+    </div>
+    <p class="panel-desc">기존에 쓰시던 <b>_로켓-택배_YYYYMMDD.xlsm</b> 파일을 한 번 업로드하면 '상품,센터정보'·'포장정보' 시트를 파이어베이스 클라우드에 저장해둡니다. 이후에는 어디서든 이 단계를 다시 하실 필요 없고, 신규 SKU/센터가 추가될 때만 최신 파일로 갱신하시면 됩니다.</p>
+
+    <div class="drop" id="dropMaster">
+      <div class="ic">📎</div>
+      <div class="t1">.xlsm / .xlsx 파일을 끌어다 놓거나 클릭해서 선택</div>
+      <div class="t2">'상품,센터정보' · '포장정보' 시트를 자동으로 찾습니다</div>
+      <input type="file" id="fileMaster" accept=".xlsx,.xlsm">
+    </div>
+
+    <div class="status-row"><span class="dot" id="masterDot"></span><span id="masterStatus">저장된 마스터 데이터 확인 중...</span></div>
+
+    <div class="kv" id="masterStats" style="display:none;">
+      <div class="cell"><div class="n" id="mProducts">0</div><div class="l">상품 매핑 (SKU)</div></div>
+      <div class="cell"><div class="n" id="mCenters">0</div><div class="l">센터 매핑</div></div>
+      <div class="cell"><div class="n" id="mPacking">0</div><div class="l">포장정보 매핑</div></div>
+    </div>
+  </div>
+
+  <!-- STEP 2: PO 업로드 -->
+  <div class="panel locked" id="step2Panel">
+    <div class="panel-head">
+      <div class="panel-title"><span class="step-no">2</span>PO_SKU_LIST 업로드 → 자동 처리</div>
+    </div>
+    <p class="panel-desc">쿠팡 WING에서 받은 <b>PO_SKU_LIST_*.xlsx</b> 원본 파일을 그대로 올리세요. 파일명은 매번 달라도 상관없습니다.</p>
+
+    <!-- 강조된 영역 -->
+    <div class="drop" id="dropPo">
+      <div class="ic">📦</div>
+      <div class="t1">PO_SKU_LIST 엑셀 업로드</div>
+      <div class="t2">쿠팡 발주 SKU 리스트 다운로드 파일 (.xlsx)</div>
+      <input type="file" id="filePo" accept=".xlsx,.xlsm">
+    </div>
+    <div class="status-row"><span class="dot" id="poDot"></span><span id="poStatus">대기 중</span></div>
+  </div>
+
+  <!-- STEP 3: 결과 -->
+  <div class="panel" id="resultPanel" style="display:none;">
+    <div class="panel-head">
+      <div class="panel-title"><span class="step-no">3</span>처리 결과 — 발주서 미리보기</div>
+    </div>
+
+    <div class="kv">
+      <div class="cell"><div class="n" id="rBoxes">0</div><div class="l">총 박스(송장) 수<br><span style="font-size:10px; opacity:0.7">(밀크런 제외)</span></div></div>
+      <div class="cell"><div class="n" id="rOrders">0</div><div class="l">발주 건수</div></div>
+      <div class="cell"><div class="n" id="rCenters">0</div><div class="l">입고 센터 수</div></div>
+      <div class="cell"><div class="n" id="rOver">0</div><div class="l" style="color:var(--warn)">9박스 초과 그룹</div></div>
+    </div>
+
+    <div id="warnArea"></div>
+
+    <div class="tbl-wrap">
+      <table id="resultTable">
+        <thead>
+          <tr>
+            <th>물류센터</th><th>발주번호</th><th>받는분성명</th><th>입고예정일</th>
+            <th>품목명</th><th>박스당수량</th><th>총발주수량</th><th>포장단위</th><th>비고</th>
+          </tr>
+        </thead>
+        <tbody id="resultBody"></tbody>
+      </table>
+    </div>
+
+    <div class="footer-actions">
+      <!-- 강조된 영역 -->
+      <button class="btn" id="btnDownload">📥 참고용 엑셀 다운로드</button>
+      <span class="filename" id="dlFilename"></span>
+    </div>
+  </div>
+
+</div>
+
+<!-- script type을 module로 변경하여 Firebase Import 사용 -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+// 사용자가 제공한 Firebase 설정
+const firebaseConfig = {
+  apiKey: "AIzaSyAWpjSgPTKWRIQAy2gyQ_ZWxubZ7-2eXWY",
+  authDomain: "shipment-bc042.firebaseapp.com",
+  projectId: "shipment-bc042",
+  storageBucket: "shipment-bc042.firebasestorage.app",
+  messagingSenderId: "961875015595",
+  appId: "1:961875015595:web:128fc2c28ba23e3b8f04ee",
+  measurementId: "G-11TJ15G6NX"
+};
+
+// Firebase 초기화
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const HEADER = ['물류센터','발주번호','주문사이트','받는분성명','입고예정일','받는분전화번호','받는분기타연락처',
+  '받는분우편번호','받는분주소(전체,분할)','주소2','박스수량','기본운임','운임구분','배송메세지1','품목명',
+  '박스당수량','옵션','SKU ID','상품코드','총발주수량','포장단위','비고'];
+const MAX_BOX_PER_DAY = 9;
+
+let masterData = null; // {products:{}, centers:{}, packing:{}, updatedAt}
+let lastResult = null; // {rows, fileDateKey}
+
+// ---------- Firestore DB ----------
+async function loadMaster(){
+  try{
+    const docRef = doc(db, "rocket_data", "master");
+    const docSnap = await getDoc(docRef);
+    if(docSnap.exists()){
+      masterData = docSnap.data();
+    } else {
+      masterData = null;
+    }
+  }catch(e){ 
+    console.error("Firebase 로드 실패:", e);
+    masterData = null; 
+  }
+  renderMasterStatus();
+}
+
+async function saveMaster(){
+  try{
+    const docRef = doc(db, "rocket_data", "master");
+    await setDoc(docRef, masterData);
+  }catch(e){ 
+    console.error('Firebase 저장 실패:', e); 
+    alert("마스터 데이터를 데이터베이스에 저장하는데 실패했습니다.");
+  }
+}
+
+async function clearMaster(){
+  try{ 
+    const docRef = doc(db, "rocket_data", "master");
+    await deleteDoc(docRef);
+  }catch(e){
+    console.error('Firebase 삭제 실패:', e);
+  }
+  masterData = null;
+  renderMasterStatus();
+}
+
+function renderMasterStatus(){
+  const dot = document.getElementById('masterDot');
+  const status = document.getElementById('masterStatus');
+  const stats = document.getElementById('masterStats');
+  const step2 = document.getElementById('step2Panel');
+  if(masterData && masterData.products){
+    dot.classList.add('on');
+    const d = masterData.updatedAt ? new Date(masterData.updatedAt).toLocaleString('ko-KR') : '';
+    status.textContent = `클라우드 마스터 데이터 연동됨 (갱신: ${d})`;
+    stats.style.display = 'flex';
+    document.getElementById('mProducts').textContent = Object.keys(masterData.products).length;
+    document.getElementById('mCenters').textContent = Object.keys(masterData.centers).length;
+    document.getElementById('mPacking').textContent = Object.keys(masterData.packing).length;
+    step2.classList.remove('locked');
+  } else {
+    dot.classList.remove('on');
+    status.textContent = '저장된 마스터 데이터가 없습니다. 먼저 업로드해 주세요.';
+    stats.style.display = 'none';
+    step2.classList.add('locked');
+  }
+}
+
+// ---------- file helpers ----------
+function readWorkbook(file){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = e => {
+      try{
+        const wb = window.XLSX.read(new Uint8Array(e.target.result), {type:'array', cellDates:true});
+        resolve(wb);
+      }catch(err){ reject(err); }
+    };
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function sheetRows(wb, name){
+  const sh = wb.Sheets[name];
+  if(!sh) return null;
+  return window.XLSX.utils.sheet_to_json(sh, {header:1, defval:null, raw:false});
+}
+
+// ---------- master parsing ----------
+function findSheetName(wb, target){
+  return wb.SheetNames.find(n => n.replace(/\s/g,'') === target.replace(/\s/g,''));
+}
+
+async function handleMasterFile(file){
+  document.getElementById('masterStatus').textContent = '엑셀 읽는 중...';
+  try{
+    const wb = await readWorkbook(file);
+    const prodSheetName = findSheetName(wb, '상품,센터정보');
+    const packSheetName = findSheetName(wb, '포장정보');
+    if(!prodSheetName || !packSheetName){
+      alert("이 파일에서 '상품,센터정보' 또는 '포장정보' 시트를 찾지 못했습니다.\n기존에 쓰시던 로켓-택배 매크로 xlsm 파일을 올려주세요.");
+      renderMasterStatus();
+      return;
+    }
+    const prodRows = sheetRows(wb, prodSheetName); 
+    const packRows = sheetRows(wb, packSheetName); 
+
+    const products = {}; 
+    const centers = {};  
+    for(let i=1; i<prodRows.length; i++){
+      const r = prodRows[i]; if(!r) continue;
+      const skuId = r[0];
+      if(skuId !== null && skuId !== '' && r[2]){
+        products[String(skuId).trim()] = { name: String(r[2]).trim() };
+      }
+      const centerName = r[8]; 
+      if(centerName){
+        centers[String(centerName).trim()] = {
+          phone: r[9] != null ? String(r[9]).trim() : '',
+          zip: r[10] != null ? String(r[10]).trim() : '',
+          addr: r[11] != null ? String(r[11]).trim() : ''
+        };
+      }
+    }
+
+    const packing = {}; 
+    for(let i=3; i<packRows.length; i++){ 
+      const r = packRows[i]; if(!r) continue;
+      const skuId = r[1]; 
+      if(skuId === null || skuId === '') continue;
+      const type = r[6] != null ? String(r[6]).trim() : '';   
+      const unitStr = r[7] != null ? String(r[7]).trim() : ''; 
+      const m = unitStr.match(/\d+/);
+      packing[String(skuId).trim()] = {
+        type,
+        unitStr,
+        unitNum: m ? parseInt(m[0], 10) : null
+      };
+    }
+
+    masterData = { products, centers, packing, updatedAt: Date.now() };
+    await saveMaster(); // Firebase에 저장!
+    renderMasterStatus();
+  }catch(err){
+    console.error(err);
+    alert('마스터 파일을 읽는 중 오류가 발생했습니다: ' + err.message);
+    renderMasterStatus();
+  }
+}
+
+// ---------- PO processing ----------
+function dateKeyFromValue(v){
+  const s = String(v == null ? '' : v).trim();
+  let m = s.match(/(\d{4})[.\/-](\d{1,2})[.\/-](\d{1,2})/);
+  if(m){
+    const yyyy = m[1], mm = m[2].padStart(2,'0'), dd = m[3].padStart(2,'0');
+    return {key:yyyy.slice(2)+mm+dd, dateText:`${yyyy}-${mm}-${dd}`};
+  }
+  m = s.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if(m){
+    const yyyy=String(+m[3] < 100 ? +m[3]+2000 : +m[3]);
+    const mm=m[1].padStart(2,'0'), dd=m[2].padStart(2,'0');
+    return {key:yyyy.slice(2)+mm+dd, dateText:`${yyyy}-${mm}-${dd}`};
+  }
+  return {key:'', dateText:s};
+}
+
+function splitBoxes(total, unit){
+  total = Number(total) || 0;
+  if(!unit || unit <= 0 || total <= unit) return [total];
+  const boxes = [];
+  let remain = total;
+  while(remain > 0){
+    const take = Math.min(unit, remain);
+    boxes.push(take);
+    remain -= take;
+  }
+  return boxes;
+}
+
+async function handlePoFile(file){
+  document.getElementById('poStatus').textContent = '읽는 중...';
+  document.getElementById('poDot').classList.remove('on');
+  try{
+    const wb = await readWorkbook(file);
+    const firstSheet = wb.SheetNames[0];
+    const rows = sheetRows(wb, firstSheet);
+    if(!rows || rows.length < 2){ throw new Error('데이터가 비어있습니다.'); }
+
+    const header = rows[0];
+    const idx = (label) => header.findIndex(h => h && String(h).trim() === label);
+    const cOrderNo = idx('발주번호'), cStatus = idx('발주현황'), cSkuId = idx('SKU ID'),
+          cCenter = idx('물류센터'), cEta = idx('입고예정일'), cConfirmQty = idx('확정수량');
+
+    if(cOrderNo<0 || cSkuId<0 || cCenter<0 || cEta<0 || cConfirmQty<0){
+      throw new Error('PO_SKU_LIST 표준 헤더를 찾을 수 없습니다. 쿠팡 원본 다운로드 파일이 맞는지 확인해 주세요.');
+    }
+
+    const missing = {skus:new Set(), centers:new Set()};
+    const groupSeq = {}; 
+    const groupCount = {}; 
+    const staged = [];
+
+    for(let i=1; i<rows.length; i++){
+      const r = rows[i]; if(!r || r[cOrderNo]==null) continue;
+      const status = cStatus>=0 ? r[cStatus] : null;
+      const qty = Number(r[cConfirmQty]) || 0;
+      if(qty <= 0) continue;
+
+      const centerNameRaw = r[cCenter] != null ? String(r[cCenter]).trim() : '';
+      const skuId = r[cSkuId] != null ? String(r[cSkuId]).trim() : '';
+      const {key: dk, dateText: etaDate} = dateKeyFromValue(r[cEta]);
+
+      const prod = masterData.products[skuId];
+      const pack = masterData.packing[skuId];
+      const center = masterData.centers[centerNameRaw];
+      if(!prod || !pack) missing.skus.add(skuId + (prod?'':' (상품정보 없음)') + (pack?'':' (포장정보 없음)'));
+      if(!center) missing.centers.add(centerNameRaw);
+
+      // 상품명 인식 키워드 폭넓게 적용
+      let extractedItemName = r[idx('등록상품명')] || r[idx('상품명')] || r[idx('옵션명')] || skuId;
+      const itemName = prod ? prod.name : extractedItemName;
+      const unitStr = pack ? pack.unitStr : '';
+      const unitNum = pack ? pack.unitNum : null;
+      const remarkBase = pack && pack.type && pack.type.replace(/\s/g,'') !== '박스' ? pack.type : '';
+
+      const boxes = splitBoxes(qty, unitNum);
+      const gkey = centerNameRaw + '__' + dk;
+      groupCount[gkey] = (groupCount[gkey]||0) + boxes.length;
+
+      staged.push({
+        orderNo: r[cOrderNo], centerNameRaw, skuId, dk, etaDate, qty,
+        itemName, unitStr, remarkBase, boxes, gkey
+      });
+    }
+
+    const outRows = [];
+    for(const s of staged){
+      for(const boxQty of s.boxes){
+        groupSeq[s.gkey] = (groupSeq[s.gkey]||0) + 1;
+        const seq = groupSeq[s.gkey];
+        
+        // 센터명과 날짜 사이에 하이픈 추가하여 포맷 일치
+        const centerLabel = `${s.centerNameRaw}-${s.dk}-${seq}`;
+        const overLimit = groupCount[s.gkey] > MAX_BOX_PER_DAY;
+        const center = masterData.centers[s.centerNameRaw] || {phone:'', zip:'', addr:''};
+        let remark = s.remarkBase;
+        if(overLimit){
+          remark = (remark ? remark + ' / ' : '') + '⚠ 9박스 초과(밀크런 확인요망)';
+        }
+        outRows.push({
+          center: centerLabel, orderNo: s.orderNo, site:'쿠팡로켓배송', receiver: s.centerNameRaw,
+          eta: s.etaDate, phone: center.phone, phone2: center.phone, zip: center.zip, addr: center.addr,
+          itemName: s.itemName, boxQty, skuId: s.skuId, totalQty: s.qty, unitStr: s.unitStr,
+          remark, overLimit, groupKey: s.gkey
+        });
+      }
+    }
+
+    const dkCount = {};
+    staged.forEach(s => { dkCount[s.dk] = (dkCount[s.dk]||0)+1; });
+    const mainDk = Object.keys(dkCount).sort((a,b)=>dkCount[b]-dkCount[a])[0] || '';
+
+    lastResult = { rows: outRows, dk: mainDk, missing, groupCount };
+    renderResult();
+
+    document.getElementById('poStatus').textContent = `처리 완료 — 총 ${rows.length-1}개 발주 행 → ${outRows.length}개 박스`;
+    document.getElementById('poDot').classList.add('on');
+  }catch(err){
+    console.error(err);
+    document.getElementById('poStatus').textContent = '오류: ' + err.message;
+    alert('처리 중 오류: ' + err.message);
+  }
+}
+
+function renderResult(){
+  const {rows, dk, missing, groupCount} = lastResult;
+  document.getElementById('resultPanel').style.display = 'block';
+
+  const orders = new Set(rows.map(r=>r.orderNo)).size;
+  const centers = new Set(rows.map(r=>r.receiver)).size;
+  const overGroups = Object.values(groupCount).filter(c => c > MAX_BOX_PER_DAY).length;
+
+  // 밀크런 제외 송장 수 카운트
+  const validBoxes = rows.filter(r => !r.overLimit).length;
+
+  document.getElementById('rBoxes').textContent = validBoxes;
+  document.getElementById('rOrders').textContent = orders;
+  document.getElementById('rCenters').textContent = centers;
+  document.getElementById('rOver').textContent = overGroups;
+
+  const warnArea = document.getElementById('warnArea');
+  warnArea.innerHTML = '';
+  const missSkus = [...missing.skus], missCenters = [...missing.centers];
+  if(missSkus.length || missCenters.length){
+    const box = document.createElement('div');
+    box.className = 'warn-box';
+    let html = '<div class="h">⚠ 마스터 데이터에서 매칭되지 않은 항목이 있습니다</div><ul>';
+    missSkus.forEach(s => html += `<li>SKU <span class="miss">${s}</span> — 상품정보/포장정보 확인 필요</li>`);
+    missCenters.forEach(c => html += `<li>물류센터 <span class="miss">${c}</span> — 센터정보 확인 필요 (연락처/주소 공란 처리됨)</li>`);
+    html += '</ul>';
+    box.innerHTML = html;
+    warnArea.appendChild(box);
+  }
+
+  const tbody = document.getElementById('resultBody');
+  tbody.innerHTML = '';
+  let prevCenter = null;
+  rows.forEach(r => {
+    const tr = document.createElement('tr');
+    if(r.receiver !== prevCenter){ tr.classList.add('new-group'); prevCenter = r.receiver; }
+    if(r.overLimit) tr.classList.add('over-limit');
+    const etaStr = String(r.eta || '');
+    tr.innerHTML = `
+      <td class="center-label">${r.center}${r.overLimit?'<span class="pill">9+</span>':''}</td>
+      <td>${r.orderNo}</td>
+      <td>${r.receiver}</td>
+      <td>${etaStr}</td>
+      <td>${r.itemName}</td>
+      <td>${r.boxQty}</td>
+      <td>${r.totalQty}</td>
+      <td>${r.unitStr}</td>
+      <td>${r.remark}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  const fname = `입고예정일_${dk}_택배 - 참고용.xlsx`;
+  document.getElementById('dlFilename').textContent = fname;
+}
+
+ async function downloadResult(){
+   if(!lastResult) return;
+   const aoa = [HEADER];
+  lastResult.rows.forEach(r => {
+    aoa.push([
+      r.center, r.orderNo, r.site, r.receiver, r.eta, r.phone, r.phone2, r.zip, r.addr,
+      '', '', '', '', '', r.itemName, r.boxQty, '', r.skuId, r.skuId, r.totalQty, r.unitStr, r.remark
+    ]);
+  });
+   const wb = new window.ExcelJS.Workbook();
+   const ws = wb.addWorksheet('3.값으로 붙여넣고 택배박스 분리 > 발주서 생성');
+   ws.addRows(aoa);
+   
+   const widths=[17.75,12,13.625,12,11.625,12.25,13.875,9.25,37.5,5.25,7.5,8,8,5.625,37.5,13.625,4.5,10.75,12,13.625,24.875,52.125];
+   const hiddenCols=new Set([2,6,9,10,11,12,13,16,17]); 
+   widths.forEach((width, i)=>{
+     const col=ws.getColumn(i+1);
+     col.width=width;
+     col.hidden=hiddenCols.has(i);
+   });
+   ws.getRow(1).height=20.1;
+   ws.autoFilter={from:'A1',to:`V${aoa.length}`};
+   const thin={style:'thin',color:{argb:'FF000000'}};
+   const headerGray='FFD9D9D9', headerOrange='FFED7D31', headerYellow='FFFFFF00', headerBlack='FF000000';
+   
+   for(let c=0;c<HEADER.length;c++){
+     const cell=ws.getCell(1,c+1);
+     const fillColor=c===0||c===15?headerOrange:c===18?headerYellow:c===19?headerBlack:headerGray;
+     cell.font={name:'맑은 고딕',size:10,bold:c===15,color:{argb:c===19?'FFFFFFFF':'FF000000'}};
+     cell.alignment={horizontal:c===8?'left':'center',vertical:'middle',wrapText:true};
+     cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:fillColor}};
+     cell.border={top:thin,bottom:thin,left:thin,right:thin};
+   }
+   
+   for(let r=1;r<aoa.length;r++){
+     const isStart=r===1 || lastResult.rows[r-1].receiver!==lastResult.rows[r-2].receiver;
+     const isEnd=r===aoa.length-1 || lastResult.rows[r].receiver!==lastResult.rows[r-1].receiver;
+     for(let c=0;c<HEADER.length;c++){
+       const cell=ws.getCell(r+1,c+1);
+       const centerCols=[0,1,2,3,4,7,15,17,18,19,20];
+       cell.font={name:'맑은 고딕',size:10,bold:c===15||c===19,color:{argb:'FF000000'}};
+       
+       // 밀크런 붉은색 표시 추가
+       if(c===0 && lastResult.rows[r-1].overLimit) {
+           cell.font.color = {argb: 'FFFF0000'}; // 붉은 텍스트
+           cell.fill = {type: 'pattern', pattern: 'solid', fgColor: {argb: 'FFFCE4D6'}}; // 붉은 배경
+       }
+       
+       cell.alignment={horizontal:centerCols.includes(c)?'center':'left',vertical:'middle',wrapText:c===8||c===14||c===21};
+       cell.border={
+         top:isStart?thin:undefined,
+         bottom:isEnd?thin:undefined,
+         left:c===0?thin:undefined,
+         right:c===HEADER.length-1?thin:undefined
+       };
+       if(c===15) cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFCE4D6'}};
+       if(c===19) cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFC6E0B4'}};
+       if(c===21 && String(cell.value||'').includes('9박스 초과')){cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFCE4D6'}};cell.font.color={argb:'FFC00000'};cell.font.bold=true;}
+     }
+   }
+   
+   ws.addConditionalFormatting({
+     ref:'V1:V1048576',
+     rules:[
+       {type:'containsText',operator:'containsText',text:'세트',formulae:['NOT(ISERROR(SEARCH("세트",V1)))'],priority:1,style:{font:{color:{argb:'FF9C5700'}},fill:{type:'pattern',pattern:'solid',bgColor:{argb:'FFFFEB9C'}}}},
+       {type:'containsText',operator:'containsText',text:'바코드',formulae:['NOT(ISERROR(SEARCH("바코드",V1)))'],priority:2,style:{font:{color:{argb:'FF9C5700'}},fill:{type:'pattern',pattern:'solid',bgColor:{argb:'FFFFEB9C'}}}}
+     ]
+   });
+   
+   const fname = `입고예정일_${lastResult.dk}_택배 - 참고용.xlsx`;
+   const buffer=await wb.xlsx.writeBuffer();
+   const url=URL.createObjectURL(new Blob([buffer],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+   const link=document.createElement('a');
+   link.href=url; link.download=fname; link.click();
+   URL.revokeObjectURL(url);
+ }
+
+// ---------- wiring ----------
+function wireDropzone(dropId, inputId, onFile){
+  const drop = document.getElementById(dropId);
+  const input = document.getElementById(inputId);
+  drop.addEventListener('click', ()=> input.click());
+  input.addEventListener('change', e => { if(e.target.files[0]) onFile(e.target.files[0]); });
+  ['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e=>{e.preventDefault(); drop.classList.add('drag');}));
+  ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e=>{e.preventDefault(); drop.classList.remove('drag');}));
+  drop.addEventListener('drop', e=>{ if(e.dataTransfer.files[0]) onFile(e.dataTransfer.files[0]); });
+}
+
+// 이벤트 연결
+wireDropzone('dropMaster','fileMaster', handleMasterFile);
+wireDropzone('dropPo','filePo', f => {
+  if(!masterData){ alert('먼저 위에서 마스터 데이터를 업로드해 주세요.'); return; }
+  handlePoFile(f);
+});
+
+document.getElementById('btnClearMaster').addEventListener('click', ()=>{
+  if(confirm('클라우드에 저장된 마스터 데이터를 초기화할까요?')) clearMaster();
+});
+
+document.getElementById('btnDownload').addEventListener('click', downloadResult);
+
+// 접속 즉시 Firebase 마스터 데이터 호출
+loadMaster();
+</script>
+</body>
+</html>
