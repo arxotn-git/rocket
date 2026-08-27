@@ -131,7 +131,7 @@
 <div class="wrap">
 
   <span class="tag">● Coupang Rocket 택배</span>
-  <h1>로켓택배 발주서 자동화 <span style="color:#8c9eff; font-weight:700; font-size:19px; margin-left:4px;">(v02)</span> <span style="font-size:12px; color:var(--sub); font-weight:400; margin-left:8px; letter-spacing:0;">최근 수정: 2026-08-26 16:25</span></h1>
+  <h1>로켓택배 발주서 자동화 <span style="color:#8c9eff; font-weight:700; font-size:19px; margin-left:4px;">(v03)</span> <span style="font-size:12px; color:var(--sub); font-weight:400; margin-left:8px; letter-spacing:0;">최근 수정: 2026-08-27 (물류센터 라벨 하이픈 버그 수정)</span></h1>
   <p class="sub">쿠팡에서 다운받은 PO_SKU_LIST 파일 하나만 올리면, VLOOKUP 매칭 → 박스 분리 → 물류센터 라벨링 → 9박스 초과 표시까지 자동으로 처리해서 참고용 엑셀 파일을 만들어 드립니다.</p>
 
   <!-- STEP 1: 마스터 데이터 -->
@@ -546,7 +546,7 @@ async function handlePoFile(file){
       for(const boxQty of s.boxes){
         groupSeq[s.gkey] = (groupSeq[s.gkey]||0) + 1;
         const seq = groupSeq[s.gkey];
-        const centerLabel = `${s.centerNameRaw}${s.dk}-${seq}`;
+        const centerLabel = `${s.centerNameRaw}-${s.dk}-${seq}`;
         const overLimit = groupCount[s.gkey] > MAX_BOX_PER_DAY;
         const center = masterData.centers[s.centerNameRaw] || {phone:'', zip:'', addr:''};
         let remark = s.remarkBase;
