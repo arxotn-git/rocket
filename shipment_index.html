@@ -7,6 +7,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <!-- 조건부 서식까지 참고용 파일과 동일하게 내보내기 위해 사용 -->
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
   :root{
     --bg:#0c1116;
@@ -123,6 +125,12 @@
   .filename{font-family:var(--mono); font-size:12px; color:var(--sub);}
 
   .locked{opacity:.4; pointer-events:none;}
+  code{font-family:var(--mono); font-size:11.5px; background:var(--panel2); border:1px solid var(--line); padding:1px 5px; border-radius:3px; color:var(--amber);}
+  input[type=text].editname{
+    background:var(--panel2); border:1px solid var(--line); color:var(--text); font-family:var(--mono);
+    font-size:11.5px; padding:4px 6px; border-radius:4px; width:220px;
+  }
+  input[type=text].editname:focus{outline:none; border-color:var(--amber);}
   ::-webkit-scrollbar{height:8px; width:8px;}
   ::-webkit-scrollbar-thumb{background:var(--line); border-radius:4px;}
 </style>
@@ -131,8 +139,8 @@
 <div class="wrap">
 
   <span class="tag">● Coupang Rocket 택배</span>
-  <h1>로켓택배 발주서 자동화 <span style="color:#8c9eff; font-weight:700; font-size:19px; margin-left:4px;">(v04)</span> <span style="font-size:12px; color:var(--sub); font-weight:400; margin-left:8px; letter-spacing:0;">최근 수정: 2026-08-27 (STEP4 송장 매칭·쉽먼트 업로드 생성 추가)</span></h1>
-  <p class="sub">쿠팡에서 다운받은 PO_SKU_LIST 파일만 올리면 참고용 엑셀까지 자동 생성되고, 위킵에서 받은 송장 발번 파일을 올리면 쉽먼트 업로드 양식까지 자동으로 만들어 드립니다.</p>
+  <h1>로켓택배 발주서 자동화 <span style="color:#8c9eff; font-weight:700; font-size:19px; margin-left:4px;">(v08)</span> <span style="font-size:12px; color:var(--sub); font-weight:400; margin-left:8px; letter-spacing:0;">최근 수정: 2026-08-28 (STEP5 ZIP 파일명에 물류센터 도착예정일 반영)</span></h1>
+  <p class="sub">쿠팡에서 다운받은 PO_SKU_LIST 파일만 올리면 참고용 엑셀 → 쉽먼트 업로드 엑셀 → 쉽먼트 라벨/동봉문서 PDF 파일명 정리까지 자동으로 처리해 드립니다.</p>
 
   <!-- STEP 1: 마스터 데이터 -->
   <div class="panel">
@@ -162,6 +170,11 @@
       <div class="cell"><div class="n" id="mProducts">0</div><div class="l">상품 매핑 (SKU)</div></div>
       <div class="cell"><div class="n" id="mCenters">0</div><div class="l">센터 매핑</div></div>
       <div class="cell"><div class="n" id="mPacking">0</div><div class="l">포장정보 매핑</div></div>
+    </div>
+
+    <div class="status-row" style="margin-top:14px; padding-top:12px; border-top:1px solid var(--line);">
+      <span style="color:var(--sub);">🗄 박스 데이터(참고용 생성 기록)는 <b style="color:var(--text);">30일</b> 지나면 자동으로 정리됩니다 (송장 매칭용 최소 보관기간 확보 목적, 용량 문제는 아님)</span>
+      <button class="btn ghost sm" id="btnCleanupNow" style="margin-left:auto;">지금 정리</button>
     </div>
   </div>
 
@@ -257,13 +270,57 @@
     </div>
   </div>
 
+  <!-- STEP 5: PDF 파일명 일괄 변경 -->
+  <div class="panel">
+    <div class="panel-head">
+      <div class="panel-title"><span class="step-no">5</span>쉽먼트 라벨·동봉문서 PDF 파일명 일괄 변경</div>
+    </div>
+    <p class="panel-desc">쿠팡에서 센터별로 하나씩 받으시는 <code>shipment_ManiFest_document(...)</code> / <code>shipment_Label_document(...)</code> PDF를 한 번에 올리면, 각 파일의 첫 페이지 내용을 읽어서 물류센터명을 자동으로 찾아 <b>동봉문서-센터명</b> / <b>쉽먼트라벨-센터명</b>으로 이름을 바꾼 뒤 ZIP 파일 하나로 묶어 드립니다. 100개 미만이면 한 번에 처리됩니다.</p>
+
+    <div class="drop" id="dropPdf">
+      <div class="ic">🏷️</div>
+      <div class="t1">PDF 파일 여러 개를 끌어다 놓거나 클릭해서 선택</div>
+      <div class="t2">shipment_ManiFest_document / shipment_Label_document (.pdf, 다중 선택 가능)</div>
+      <input type="file" id="filePdf" accept=".pdf" multiple>
+    </div>
+    <div style="text-align:center; margin-top:8px;">
+      <button class="btn ghost sm" id="btnPickFolder">📁 데스크탑 '쉽먼트' 폴더 통째로 선택</button>
+      <input type="file" id="filePdfFolder" webkitdirectory directory multiple style="display:none;">
+    </div>
+    <div class="status-row"><span class="dot" id="pdfDot"></span><span id="pdfStatus">대기 중</span></div>
+
+    <div id="pdfResultArea" style="display:none;">
+      <div class="kv">
+        <div class="cell"><div class="n" id="pOk">0</div><div class="l">자동 인식 성공</div></div>
+        <div class="cell"><div class="n" id="pFail" style="color:var(--warn)">0</div><div class="l">인식 실패(직접 입력 필요)</div></div>
+        <div class="cell"><div class="n" id="pDup" style="color:var(--warn)">0</div><div class="l">파일명 중복(자동 번호 부여)</div></div>
+      </div>
+
+      <div id="pdfWarnArea"></div>
+
+      <div class="tbl-wrap">
+        <table id="pdfTable">
+          <thead>
+            <tr><th>원본 파일명</th><th>문서 종류</th><th>감지된 센터</th><th>새 파일명</th><th>상태</th></tr>
+          </thead>
+          <tbody id="pdfBody"></tbody>
+        </table>
+      </div>
+
+      <div class="footer-actions">
+        <button class="btn" id="btnDownloadPdfZip">📥 이름 변경된 PDF 전체 ZIP 다운로드</button>
+        <span class="filename" id="pdfZipFilename"></span>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <!-- Firebase 모듈 스크립트 -->
 <script type="module">
 // --- STREAMING_CHUNK:Initializing Firebase... ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc, deleteDoc, collection, addDoc, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, deleteDoc, collection, addDoc, getDocs, query, orderBy, where, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 // STEP4(쉽먼트 업로드)에서 쓰는 것도 같은 모듈에서 가져옴 (별도 import 라인 없이 위 구문에 이미 필요한 함수 포함)
 
 // 사용자 제공 Firebase 설정
@@ -291,6 +348,13 @@ let masterData = null; // {products:{}, centers:{}, packing:{}, updatedAt}
 let lastResult = null; // {rows, fileDateKey}
 let lastUploadedBuffer = null; // 파일 원본 저장을 위한 버퍼
 let lastInvoiceResult = null; // {shipRows, unmatched, missingMaster} - STEP4 송장 매칭 결과
+let pdfJobs = []; // STEP5: [{file, origName, docType, center, newName, status}]
+let pdfjsReady = false;
+
+// 박스 레코드(rocket_box_records) 보관 기간 — 이 기간이 지나면 자동 삭제된다.
+// 참고용 생성일 기준. 송장이 늦게 나오는 경우(주말/재고이슈 등)에도 STEP4 매칭이 가능하도록
+// 최소 2~3주는 남겨두는 게 안전해서 30일로 설정. 필요하면 아래 숫자만 바꾸면 됨.
+const BOX_RECORD_RETENTION_DAYS = 30;
 
 // --- STREAMING_CHUNK:Base64 Encoding Helpers... ---
 // 파일을 Firestore에 저장하기 위해 Base64 문자열로 변환하는 유틸리티
@@ -384,6 +448,33 @@ async function persistBoxRecords(rows){
     }, { merge: true })));
   }catch(e){
     console.error('박스 레코드 저장 실패:', e);
+  }
+}
+
+// 보관 기간(BOX_RECORD_RETENTION_DAYS)이 지난 박스 레코드를 정리한다.
+// - 용량/과금 문제 때문이 아니라(이 정도 물량은 무료 한도에 비하면 미미함), DB를 깔끔하게 유지하기 위한 용도.
+// - 페이지 접속 시 자동으로 1번 실행되고, 1단계 패널의 '지금 정리' 버튼으로도 수동 실행 가능.
+async function cleanupOldBoxRecords(silent){
+  try{
+    const cutoff = Date.now() - BOX_RECORD_RETENTION_DAYS*24*60*60*1000;
+    const q = query(collection(db, 'rocket_box_records'), where('savedAt', '<', cutoff));
+    const snap = await getDocs(q);
+    if(snap.empty){
+      if(!silent) alert(`${BOX_RECORD_RETENTION_DAYS}일이 지난 박스 데이터가 없습니다.`);
+      return 0;
+    }
+    const docs = snap.docs;
+    for(let i=0; i<docs.length; i+=400){ // Firestore 배치 최대 500건 제한 대비 여유있게 400건씩
+      const batch = writeBatch(db);
+      docs.slice(i, i+400).forEach(d => batch.delete(d.ref));
+      await batch.commit();
+    }
+    if(!silent) alert(`${docs.length}건의 오래된 박스 데이터를 정리했습니다.`);
+    return docs.length;
+  }catch(e){
+    console.error('박스 레코드 정리 실패:', e);
+    if(!silent) alert('정리 중 오류가 발생했습니다: ' + e.message);
+    return 0;
   }
 }
 
@@ -1004,6 +1095,177 @@ async function downloadShipment(){
   }catch(e){ console.error('exported 플래그 갱신 실패:', e); }
 }
 
+// --- STREAMING_CHUNK:STEP5 PDF Rename Logic... ---
+function ensurePdfjs(){
+  if(pdfjsReady) return;
+  if(window['pdfjs-dist/build/pdf']) window.pdfjsLib = window['pdfjs-dist/build/pdf'];
+  if(window.pdfjsLib){
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    pdfjsReady = true;
+  }
+}
+
+async function extractFirstPageText(file){
+  const buf = await file.arrayBuffer();
+  const pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
+  const page = await pdf.getPage(1);
+  const content = await page.getTextContent();
+  return content.items.map(it => it.str).join(' ');
+}
+
+function detectDocType(filename, text){
+  const fn = filename.toLowerCase();
+  if(fn.includes('manifest')) return '동봉문서';
+  if(fn.includes('label')) return '쉽먼트라벨';
+  if(text.includes('동봉문서')) return '동봉문서';
+  if(text.includes('부착문서') || text.includes('쉽먼트라벨') || text.includes('라벨')) return '쉽먼트라벨';
+  return null;
+}
+
+function detectCenter(text){
+  const m = text.match(/주세요\s*([가-힣]{2,8}\d{1,3})\s*박스\s*\d+-\d+/);
+  if(m) return m[1];
+  // 백업 패턴: '박스 N-M' 앞의 한글+숫자 토큰을 폭넓게 탐색
+  const m2 = text.match(/([가-힣]{2,8}\d{1,3})\s*박스\s*\d+-\d+/);
+  return m2 ? m2[1] : null;
+}
+
+// 동봉문서/쉽먼트라벨 두 양식 모두 '물류센터 도착예정일' 날짜가 페이지에 하나만 등장하므로 그대로 탐색
+function detectArrivalDate(text){
+  const m = text.match(/(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[1]}${m[2]}${m[3]}` : null;
+}
+
+async function handlePdfFiles(fileList){
+  ensurePdfjs();
+  if(!window.pdfjsLib){ alert('PDF 처리 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침해 주세요.'); return; }
+  const files = Array.from(fileList).filter(f => f.name.toLowerCase().endsWith('.pdf'));
+  if(files.length === 0){ alert('PDF 파일이 없습니다.'); return; }
+  if(files.length > 150){ alert('한 번에 150개 이하로 올려주세요.'); return; }
+
+  document.getElementById('pdfStatus').textContent = `분석 중... (0/${files.length})`;
+  document.getElementById('pdfDot').classList.remove('on');
+
+  const jobs = [];
+  for(let i=0; i<files.length; i++){
+    const file = files[i];
+    let text = '', docType = null, center = null, arrivalDate = null, status = 'ok';
+    try{
+      text = await extractFirstPageText(file);
+      docType = detectDocType(file.name, text);
+      center = detectCenter(text);
+      arrivalDate = detectArrivalDate(text);
+      if(!docType || !center) status = 'fail';
+    }catch(e){
+      console.error('PDF 파싱 실패:', file.name, e);
+      status = 'fail';
+    }
+    let baseName = (docType && center) ? `${docType}-${center}` : file.name.replace(/\.pdf$/i, '');
+    jobs.push({ file, origName: file.name, docType, center, arrivalDate, baseName, status });
+    document.getElementById('pdfStatus').textContent = `분석 중... (${i+1}/${files.length})`;
+  }
+
+  // 파일명 중복 처리 (같은 이름이면 (2),(3)... 부여)
+  const seen = {};
+  let dupCount = 0;
+  jobs.forEach(j => {
+    seen[j.baseName] = (seen[j.baseName] || 0) + 1;
+    if(seen[j.baseName] > 1){ j.newName = `${j.baseName}(${seen[j.baseName]}).pdf`; dupCount++; }
+    else{ j.newName = `${j.baseName}.pdf`; }
+  });
+
+  pdfJobs = jobs;
+  renderPdfTable();
+
+  const okCount = jobs.filter(j => j.status === 'ok').length;
+  document.getElementById('pdfStatus').textContent = `분석 완료 — 총 ${jobs.length}개 (성공 ${okCount} / 확인필요 ${jobs.length-okCount})`;
+  document.getElementById('pdfDot').classList.add('on');
+}
+
+// PDF들에서 뽑은 물류센터 도착예정일 중 가장 많이 등장한 날짜를 대표값으로 사용.
+// 하나도 못 찾았으면 날짜 없이 '로켓-택배)동봉문서_' 형태로 반환.
+function computeZipFilename(jobs){
+  const counts = {};
+  jobs.forEach(j => { if(j.arrivalDate) counts[j.arrivalDate] = (counts[j.arrivalDate]||0) + 1; });
+  const dates = Object.keys(counts).sort((a,b) => counts[b]-counts[a]);
+  const mainDate = dates[0] || '';
+  return `로켓-택배)동봉문서_${mainDate}.zip`;
+}
+
+function renderPdfTable(){
+  document.getElementById('pdfResultArea').style.display = 'block';
+  const okJobs = pdfJobs.filter(j => j.status === 'ok');
+  const failJobs = pdfJobs.filter(j => j.status !== 'ok');
+  document.getElementById('pOk').textContent = okJobs.length;
+  document.getElementById('pFail').textContent = failJobs.length;
+  document.getElementById('pDup').textContent = pdfJobs.filter(j => /\(\d+\)\.pdf$/.test(j.newName)).length;
+
+  const warnArea = document.getElementById('pdfWarnArea');
+  warnArea.innerHTML = '';
+  if(failJobs.length){
+    const box = document.createElement('div');
+    box.className = 'warn-box';
+    let html = '<div class="h">⚠ 자동 인식에 실패한 파일이 있습니다 — 아래 표에서 새 파일명을 직접 입력해 주세요</div><ul>';
+    failJobs.forEach(j => html += `<li><span class="miss">${j.origName}</span> — 문서 종류/센터명을 텍스트에서 찾지 못했습니다 (스캔본이거나 서식이 다를 수 있습니다).</li>`);
+    html += '</ul>';
+    box.innerHTML = html;
+    warnArea.appendChild(box);
+  }
+
+  const tbody = document.getElementById('pdfBody');
+  tbody.innerHTML = '';
+  pdfJobs.forEach((j, idx) => {
+    const tr = document.createElement('tr');
+    if(j.status !== 'ok') tr.classList.add('over-limit');
+    tr.innerHTML = `
+      <td>${j.origName}</td>
+      <td>${j.docType || '<span class="miss">미인식</span>'}</td>
+      <td>${j.center || '<span class="miss">미인식</span>'}</td>
+      <td><input type="text" class="editname" data-idx="${idx}" value="${j.newName}"></td>
+      <td>${j.status === 'ok' ? '✅ 정상' : '⚠ 확인필요'}</td>`;
+    tbody.appendChild(tr);
+  });
+  tbody.querySelectorAll('.editname').forEach(inp => {
+    inp.addEventListener('input', e => {
+      const idx = +e.target.dataset.idx;
+      let v = e.target.value.trim();
+      if(v && !v.toLowerCase().endsWith('.pdf')) v += '.pdf';
+      pdfJobs[idx].newName = v || pdfJobs[idx].newName;
+    });
+  });
+
+  document.getElementById('pdfZipFilename').textContent = computeZipFilename(pdfJobs);
+}
+
+async function downloadPdfZip(){
+  if(!pdfJobs.length) return;
+  // 최종 파일명 다시 한 번 중복 체크 (수동 수정으로 인한 충돌 방지)
+  const finalNames = {};
+  pdfJobs.forEach(j => {
+    let name = j.newName && j.newName.trim() ? j.newName.trim() : j.origName;
+    if(finalNames[name]){
+      finalNames[name]++;
+      const base = name.replace(/\.pdf$/i, '');
+      name = `${base}(중복${finalNames[name]}).pdf`;
+    }else{
+      finalNames[name] = 1;
+    }
+    j.finalName = name;
+  });
+
+  const zip = new window.JSZip();
+  for(const j of pdfJobs){
+    const buf = await j.file.arrayBuffer();
+    zip.file(j.finalName, buf);
+  }
+  const blob = await zip.generateAsync({ type:'blob' });
+  const fname = computeZipFilename(pdfJobs);
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url; link.download = fname; link.click();
+  URL.revokeObjectURL(url);
+}
+
 // --- STREAMING_CHUNK:Event Wiring... ---
 function wireDropzone(dropId, inputId, onFile){
   const drop = document.getElementById(dropId);
@@ -1024,6 +1286,7 @@ wireDropzone('dropPo','filePo', f => {
 document.getElementById('btnClearMaster').addEventListener('click', ()=>{
   if(confirm('클라우드에 저장된 마스터 데이터를 초기화할까요?')) clearMaster();
 });
+document.getElementById('btnCleanupNow').addEventListener('click', ()=> cleanupOldBoxRecords(false));
 
 document.getElementById('btnDownload').addEventListener('click', downloadResult);
 
@@ -1033,8 +1296,26 @@ wireDropzone('dropInvoice','fileInvoice', f => {
 });
 document.getElementById('btnDownloadShipment').addEventListener('click', downloadShipment);
 
+// STEP5: PDF 다중 업로드 (드롭존은 multiple 파일을 직접 받아야 하므로 wireDropzone과 별도 처리)
+(function wirePdfInputs(){
+  const drop = document.getElementById('dropPdf');
+  const input = document.getElementById('filePdf');
+  drop.addEventListener('click', ()=> input.click());
+  input.addEventListener('change', e => { if(e.target.files.length) handlePdfFiles(e.target.files); });
+  ['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e=>{e.preventDefault(); drop.classList.add('drag');}));
+  ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e=>{e.preventDefault(); drop.classList.remove('drag');}));
+  drop.addEventListener('drop', e=>{ e.preventDefault(); if(e.dataTransfer.files.length) handlePdfFiles(e.dataTransfer.files); });
+
+  const folderBtn = document.getElementById('btnPickFolder');
+  const folderInput = document.getElementById('filePdfFolder');
+  folderBtn.addEventListener('click', ()=> folderInput.click());
+  folderInput.addEventListener('change', e => { if(e.target.files.length) handlePdfFiles(e.target.files); });
+})();
+document.getElementById('btnDownloadPdfZip').addEventListener('click', downloadPdfZip);
+
 // 접속 즉시 Firebase 마스터 데이터 및 히스토리 호출
 loadMaster();
+cleanupOldBoxRecords(true); // 30일 지난 박스 레코드 조용히 정리 (실패해도 앱 동작에는 영향 없음)
 </script>
 </body>
 </html>
