@@ -61,11 +61,11 @@
   .drop .t1{font-size:13.5px; font-weight:600;}
   .drop .t2{font-size:11.5px; color:var(--sub); margin-top:3px; font-family:var(--mono);}
   
-  /* STEP 2 PO 업로드 영역 시각적 강조 */
-  #dropPo { border: 2px dashed var(--amber); background: rgba(255,176,32,.06); padding: 32px 22px; }
-  #dropPo:hover, #dropPo.drag { background: rgba(255,176,32,.12); }
-  #dropPo .ic { font-size: 28px; color: var(--amber); opacity: 1; }
-  #dropPo .t1 { font-size: 15px; color: var(--amber); }
+  /* STEP 2 PO 업로드 영역 시각적 강조 (쉽먼트 / 밀크런 공통) */
+  #dropPo, #dropPoMr { border: 2px dashed var(--amber); background: rgba(255,176,32,.06); padding: 32px 22px; }
+  #dropPo:hover, #dropPo.drag, #dropPoMr:hover, #dropPoMr.drag { background: rgba(255,176,32,.12); }
+  #dropPo .ic, #dropPoMr .ic { font-size: 28px; color: var(--amber); opacity: 1; }
+  #dropPo .t1, #dropPoMr .t1 { font-size: 15px; color: var(--amber); }
 
   input[type=file]{display:none;}
 
@@ -146,7 +146,7 @@
 <div class="wrap">
 
   <span class="tag">● Coupang Rocket 택배</span>
-  <h1>로켓배송 발주서 자동화 <span style="color:#8c9eff; font-weight:700; font-size:19px; margin-left:4px;">(v09)</span> <span style="font-size:12px; color:var(--sub); font-weight:400; margin-left:8px; letter-spacing:0;">최근 수정: 2026-08-31 (밀크런 탭 1단계: 참고용 엑셀 생성 추가)</span></h1>
+  <h1>로켓배송 발주서 자동화 <span style="color:#8c9eff; font-weight:700; font-size:19px; margin-left:4px;">(v11)</span> <span style="font-size:12px; color:var(--sub); font-weight:400; margin-left:8px; letter-spacing:0;">최근 수정: 2026-08-31 (세트상품 그룹 무게 인식 버그 수정, 파렛트 수를 중량기준 잠정치로 변경)</span></h1>
   <p class="sub">로켓택배(쉽먼트)와 로켓 밀크런(용차) 발주서를 탭으로 나눠서 처리합니다. 마스터 데이터는 두 탭이 공용으로 사용합니다.</p>
 
   <!-- STEP 1: 마스터 데이터 -->
@@ -351,10 +351,11 @@
       </div>
 
       <div class="kv">
-        <div class="cell"><div class="n" id="mrRows">0</div><div class="l">총 SKU 행 수</div></div>
         <div class="cell"><div class="n" id="mrOrders">0</div><div class="l">발주 건수</div></div>
-        <div class="cell"><div class="n" id="mrCenters">0</div><div class="l">입고 센터 수</div></div>
+        <div class="cell"><div class="n" id="mrRows">0</div><div class="l">총 SKU 행 수</div></div>
         <div class="cell"><div class="n" id="mrTotalBox">0</div><div class="l">총 박스수량 합계</div></div>
+        <div class="cell"><div class="n" id="mrTotalWeight">0</div><div class="l">총 SKU 무게(kg)</div></div>
+        <div class="cell"><div class="n" id="mrPallets">0</div><div class="l">총 파렛트 수</div></div>
       </div>
 
       <div id="mrWarnArea"></div>
@@ -643,19 +644,46 @@ async function handleMasterFile(file){
       }
     }
 
+    // 무게(g)/파렛트 최대포장단위 컬럼은 헤더 텍스트로 위치를 찾음 (기본값: J열=무게, I열=파렛트단위)
+    const packHeaderRow = packRows[2] || [];
+    const findPackCol = (label) => packHeaderRow.findIndex(h => h && String(h).replace(/\s/g,'').includes(label));
+    let weightColIdx = findPackCol('무게'); if(weightColIdx < 0) weightColIdx = 9;   // J열: 무게(g)
+    let palletColIdx = findPackCol('파렛트'); if(palletColIdx < 0) palletColIdx = 8; // I열: 파렛트 최대포장단위
+
     const packing = {}; 
-    for(let i=3; i<packRows.length; i++){ 
-      const r = packRows[i]; if(!r) continue;
-      const skuId = r[1]; 
-      if(skuId === null || skuId === '') continue;
+    let pi = 3;
+    while(pi < packRows.length){
+      const r = packRows[pi];
+      if(!r || r[1] === null || r[1] === ''){ pi++; continue; }
+      const skuId = r[1];
       const type = r[6] != null ? String(r[6]).trim() : '';   
       const unitStr = r[7] != null ? String(r[7]).trim() : ''; 
       const m = unitStr.match(/\d+/);
+      const palletUnitStr = r[palletColIdx] != null ? String(r[palletColIdx]).trim() : '';
+      const pm = palletUnitStr.match(/\d+/);
+
+      // 세트상품은 SKU 행(SKU ID 있는 행) 자체가 아니라, 셀 테두리로만 구분된 하위 '구성' 행들 중
+      // 한 곳에만 무게가 입력돼 있을 수 있음 → 다음 SKU 행이 나오기 전까지 그룹 전체를 훑어서 무게를 찾는다.
+      let weightG = 0;
+      let pj = pi;
+      while(pj < packRows.length){
+        const rr = packRows[pj];
+        if(pj > pi && rr && rr[1] != null && rr[1] !== '') break; // 다음 SKU 행이면 그룹 종료
+        if(rr && rr[weightColIdx] != null && rr[weightColIdx] !== ''){
+          const w = Number(rr[weightColIdx]);
+          if(!isNaN(w) && w > 0){ weightG = w; break; }
+        }
+        pj++;
+      }
+
       packing[String(skuId).trim()] = {
         type,
         unitStr,
-        unitNum: m ? parseInt(m[0], 10) : null
+        unitNum: m ? parseInt(m[0], 10) : null,
+        weightG,
+        palletUnitNum: pm ? parseInt(pm[0], 10) : null // 파렛트 1개당 최대 수량 (박스규격 확보 전까지 미사용)
       };
+      pi++;
     }
 
     masterData = { products, centers, packing, updatedAt: Date.now() };
@@ -985,6 +1013,16 @@ function computeBoxCount(total, unit){
   return Math.ceil(total / unit);
 }
 
+// 파렛트 수(잠정) = 총 SKU 무게(kg) ÷ 파렛트 1개당 최대중량(1,000kg), 올림.
+// 쿠팡 팔레트 규격(T11형 1,100x1,100mm, 적재높이 1.7m 이하, 최대중량 1,000kg, 1개 파렛트에 SKU 혼적 가능) 기준.
+// SKU별 박스 규격(가로/세로/높이)이 확정되면 부피 기준 적재 계산으로 정교화 예정 — 그 전까지는 중량 기준 잠정치.
+function estimatePalletCount(totalWeightKg){
+  const PALLET_MAX_WEIGHT_KG = 1000;
+  const w = Number(totalWeightKg) || 0;
+  if(w <= 0) return 0;
+  return Math.ceil(w / PALLET_MAX_WEIGHT_KG);
+}
+
 async function handlePoFileMilkrun(file){
   document.getElementById('poMrStatus').textContent = '읽는 중...';
   document.getElementById('poMrDot').classList.remove('on');
@@ -1028,13 +1066,15 @@ async function handlePoFileMilkrun(file){
       const remark = pack && pack.type && pack.type.replace(/\s/g,'') !== '박스' ? pack.type : '';
 
       const boxCount = computeBoxCount(qty, unitNum);
+      const weightG = pack ? (pack.weightG || 0) : 0;
+      const palletUnitNum = pack ? pack.palletUnitNum : null;
       dkCount[dk] = (dkCount[dk]||0) + 1;
       centerCount[centerNameRaw] = (centerCount[centerNameRaw]||0) + 1;
 
       outRows.push({
         center: centerNameRaw, orderNo: r[cOrderNo], site:'쿠팡로켓배송', receiver: centerNameRaw,
         eta: etaDate, dk, phone: center.phone, phone2: center.phone, zip: center.zip, addr: center.addr,
-        itemName, boxQty: boxCount, skuId, totalQty: qty, unitStr, remark
+        itemName, boxQty: boxCount, skuId, totalQty: qty, unitStr, remark, weightG, palletUnitNum
       });
     }
 
@@ -1058,13 +1098,15 @@ function renderResultMilkrun(){
   document.getElementById('resultPanelMr').style.display = 'block';
 
   const orders = new Set(rows.map(r=>r.orderNo)).size;
-  const centers = new Set(rows.map(r=>r.receiver)).size;
   const totalBox = rows.reduce((sum,r)=>sum+(Number(r.boxQty)||0),0);
+  const totalWeightKg = rows.reduce((sum,r)=>sum+(Number(r.totalQty)||0)*(Number(r.weightG)||0),0) / 1000;
+  const totalPallets = estimatePalletCount(totalWeightKg);
 
-  document.getElementById('mrRows').textContent = rows.length;
   document.getElementById('mrOrders').textContent = orders;
-  document.getElementById('mrCenters').textContent = centers;
+  document.getElementById('mrRows').textContent = rows.length;
   document.getElementById('mrTotalBox').textContent = totalBox;
+  document.getElementById('mrTotalWeight').textContent = totalWeightKg.toLocaleString('ko-KR', {maximumFractionDigits:1, minimumFractionDigits:1});
+  document.getElementById('mrPallets').textContent = totalPallets;
 
   const warnArea = document.getElementById('mrWarnArea');
   warnArea.innerHTML = '';
