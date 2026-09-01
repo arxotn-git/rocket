@@ -19,10 +19,10 @@
     --sub:#8ea2b4;
     --amber:#ffb020;
     --amber-dim:#7a5a1c;
-    --teal:#22d3ee;
-    --teal-dim:#1a6b78;
     --ok:#3ecf8e;
     --warn:#ff5d5d;
+    --milk:#4fc3f7;
+    --milk-dim:#1c4a63;
     --mono:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;
     --sans:-apple-system,'Apple SD Gothic Neo','Malgun Gothic','Segoe UI',sans-serif;
   }
@@ -63,16 +63,16 @@
   .drop .t1{font-size:13.5px; font-weight:600;}
   .drop .t2{font-size:11.5px; color:var(--sub); margin-top:3px; font-family:var(--mono);}
   
-  /* STEP 2 PO 업로드 영역 시각적 강조 (택배=amber, 밀크런=teal로 색상 구분) */
+  /* STEP 2 PO 업로드 영역 시각적 강조 (쉽먼트=amber / 밀크런=milk 색상으로 구분) */
   #dropPo { border: 2px dashed var(--amber); background: rgba(255,176,32,.06); padding: 32px 22px; }
   #dropPo:hover, #dropPo.drag { background: rgba(255,176,32,.12); }
   #dropPo .ic { font-size: 28px; color: var(--amber); opacity: 1; }
   #dropPo .t1 { font-size: 15px; color: var(--amber); }
 
-  #dropPoMr { border: 2px dashed var(--teal); background: rgba(34,211,238,.07); padding: 32px 22px; }
-  #dropPoMr:hover, #dropPoMr.drag { background: rgba(34,211,238,.13); }
-  #dropPoMr .ic { font-size: 28px; color: var(--teal); opacity: 1; }
-  #dropPoMr .t1 { font-size: 15px; color: var(--teal); }
+  #dropPoMr { border: 2px dashed var(--milk); background: rgba(79,195,247,.06); padding: 32px 22px; }
+  #dropPoMr:hover, #dropPoMr.drag { background: rgba(79,195,247,.12); }
+  #dropPoMr .ic { font-size: 28px; color: var(--milk); opacity: 1; }
+  #dropPoMr .t1 { font-size: 15px; color: var(--milk); }
 
   input[type=file]{display:none;}
 
@@ -97,10 +97,10 @@
   .kv{display:flex; flex-wrap:wrap; gap:10px; margin-top:12px;}
   .kv .cell{
     flex:1; min-width:130px; background:var(--panel2); border:1px solid var(--line);
-    border-radius:7px; padding:10px 12px;
+    border-radius:7px; padding:10px 12px; display:flex; align-items:baseline; gap:7px; white-space:nowrap; overflow:hidden;
   }
   .kv .cell .n{font-family:var(--mono); font-size:19px; color:var(--amber); font-weight:700;}
-  .kv .cell .l{font-size:11px; color:var(--sub); margin-top:2px;}
+  .kv .cell .l{font-size:11px; color:var(--sub); overflow:hidden; text-overflow:ellipsis;}
 
   .status-row{display:flex; align-items:center; gap:8px; font-size:12.5px; margin-top:10px; color:var(--sub);}
   .dot{width:7px; height:7px; border-radius:50%; background:var(--line);}
@@ -132,15 +132,15 @@
   .filename{font-family:var(--mono); font-size:12px; color:var(--sub);}
 
   .locked{opacity:.4; pointer-events:none;}
-  .tabbar{display:flex; gap:10px; margin:24px 0 20px;}
+  .tabbar{display:flex; gap:10px; margin:22px 0 18px;}
   .tabbtn{
     flex:1; background:var(--panel); border:2px solid var(--line); color:var(--sub);
-    font-weight:800; font-size:16px; padding:18px 20px; border-radius:11px; cursor:pointer; transition:.12s;
+    font-weight:700; font-size:15.5px; padding:16px 18px; border-radius:10px; cursor:pointer; transition:.12s;
   }
   .tabbtn:hover{border-color:var(--amber); color:var(--text);}
-  .tabbtn.active{background:rgba(255,176,32,.12); border-color:var(--amber); color:var(--amber); box-shadow:0 4px 16px rgba(255,176,32,.18);}
-  #tabBtnMilkrun:hover{border-color:var(--teal); color:var(--text);}
-  #tabBtnMilkrun.active{background:rgba(34,211,238,.12); border-color:var(--teal); color:var(--teal); box-shadow:0 4px 16px rgba(34,211,238,.18);}
+  .tabbtn.active{background:rgba(255,176,32,.12); border-color:var(--amber); color:var(--amber); box-shadow:0 3px 14px rgba(255,176,32,.18);}
+  .tabbtn.milk:hover{border-color:var(--milk); color:var(--text);}
+  .tabbtn.milk.active{background:rgba(79,195,247,.12); border-color:var(--milk); color:var(--milk); box-shadow:0 3px 14px rgba(79,195,247,.18);}
   code{font-family:var(--mono); font-size:11.5px; background:var(--panel2); border:1px solid var(--line); padding:1px 5px; border-radius:3px; color:var(--amber);}
   input[type=text].editname{
     background:var(--panel2); border:1px solid var(--line); color:var(--text); font-family:var(--mono);
@@ -155,7 +155,7 @@
 <div class="wrap">
 
   <span class="tag">● Coupang Rocket 택배</span>
-  <h1>로켓배송 발주서 자동화 <span style="color:#8c9eff; font-weight:700; font-size:19px; margin-left:4px;">(v13)</span> <span style="font-size:12px; color:var(--sub); font-weight:400; margin-left:8px; letter-spacing:0;">최근 수정: 2026-09-01 14:30 (UI 정리: 탭/드롭존 색상 구분, 위킵용 다운로드 버튼 강조, 컬럼 숨김 처리)</span></h1>
+  <h1>로켓배송 발주서 자동화 <span style="color:#8c9eff; font-weight:700; font-size:19px; margin-left:4px;">(v15)</span> <span style="font-size:12px; color:var(--sub); font-weight:400; margin-left:8px; letter-spacing:0;">최근 수정: 2026-09-01 (적재리스트 서식 원본과 동일하게 재작업, 현장 참고용 단수 가이드 추가, 위킵버튼 복구)</span></h1>
   <p class="sub">로켓택배(쉽먼트)와 로켓 밀크런(용차) 발주서를 탭으로 나눠서 처리합니다. 마스터 데이터는 두 탭이 공용으로 사용합니다.</p>
 
   <!-- STEP 1: 마스터 데이터 -->
@@ -182,10 +182,10 @@
 
     <div class="status-row"><span class="dot" id="masterDot"></span><span id="masterStatus">클라우드 마스터 데이터 연결 중...</span></div>
 
-    <div class="status-row" id="masterStats" style="display:none; gap:16px;">
-      <span>📦 상품 매핑 <b style="color:var(--amber); font-family:var(--mono);" id="mProducts">0</b>건</span>
-      <span>🏢 센터 매핑 <b style="color:var(--amber); font-family:var(--mono);" id="mCenters">0</b>건</span>
-      <span>📮 포장정보 매핑 <b style="color:var(--amber); font-family:var(--mono);" id="mPacking">0</b>건</span>
+    <div class="kv" id="masterStats" style="display:none;">
+      <div class="cell"><div class="n" id="mProducts">0</div><div class="l">상품 매핑 (SKU)</div></div>
+      <div class="cell"><div class="n" id="mCenters">0</div><div class="l">센터 매핑</div></div>
+      <div class="cell"><div class="n" id="mPacking">0</div><div class="l">포장정보 매핑</div></div>
     </div>
 
     <div class="status-row" style="margin-top:14px; padding-top:12px; border-top:1px solid var(--line);">
@@ -198,7 +198,7 @@
   <!-- 탭 스위처: 로켓택배(쉽먼트) / 로켓 밀크런(용차) -->
   <div class="tabbar">
     <button class="tabbtn active" id="tabBtnParcel">🚚 로켓택배 (쉽먼트)</button>
-    <button class="tabbtn" id="tabBtnMilkrun">🚛 로켓 밀크런 (용차)</button>
+    <button class="tabbtn milk" id="tabBtnMilkrun">🚛 로켓 밀크런 (용차)</button>
   </div>
 
   <div id="tab-parcel">
@@ -384,7 +384,7 @@
       <div class="footer-actions">
         <button class="btn" id="btnDownloadMr">📥 참고용 엑셀 다운로드</button>
         <span class="filename" id="mrDlFilename"></span>
-        <button class="btn" id="btnDownloadWeekeep" style="margin-left:auto; background:var(--teal); color:#062226;">📤 위킵용 엑셀 다운로드</button>
+        <button class="btn" id="btnDownloadWeekeep" style="margin-left:auto; background:var(--milk); color:#062226;">📤 위킵용 엑셀 다운로드</button>
       </div>
     </div>
   </div><!-- /tab-milkrun -->
@@ -656,11 +656,13 @@ async function handleMasterFile(file){
       }
     }
 
-    // 무게(g)/파렛트 최대포장단위 컬럼은 헤더 텍스트로 위치를 찾음 (기본값: J열=무게, I열=파렛트단위)
+    // 무게(g)/파렛트 최대포장단위/박스이름/박스크기 컬럼은 헤더 텍스트로 위치를 찾음 (열 순서가 바뀌어도 안전)
     const packHeaderRow = packRows[2] || [];
     const findPackCol = (label) => packHeaderRow.findIndex(h => h && String(h).replace(/\s/g,'').includes(label));
-    let weightColIdx = findPackCol('무게'); if(weightColIdx < 0) weightColIdx = 9;   // J열: 무게(g)
-    let palletColIdx = findPackCol('파렛트'); if(palletColIdx < 0) palletColIdx = 8; // I열: 파렛트 최대포장단위
+    let weightColIdx = findPackCol('무게'); if(weightColIdx < 0) weightColIdx = 11;      // 무게(g)
+    let palletColIdx = findPackCol('파렛트'); if(palletColIdx < 0) palletColIdx = 8;     // 파렛트 최대포장단위(미사용)
+    let boxNameColIdx = findPackCol('박스이름'); if(boxNameColIdx < 0) boxNameColIdx = 9;  // 박스 이름
+    let boxSizeColIdx = findPackCol('박스크기'); if(boxSizeColIdx < 0) boxSizeColIdx = 10; // 박스 크기(mm)
 
     const packing = {}; 
     let pi = 3;
@@ -701,14 +703,22 @@ async function handleMasterFile(file){
       }
       const ownBarcode = r[2] != null ? String(r[2]).trim() : '';
 
+      // 박스 이름/박스 크기(mm, "가로*세로*높이") — 파렛트 적재리스트 계산용
+      const boxName = r[boxNameColIdx] != null ? String(r[boxNameColIdx]).trim() : '';
+      const boxSizeStr = r[boxSizeColIdx] != null ? String(r[boxSizeColIdx]).trim() : '';
+      const sizeNums = boxSizeStr.split(/[x×*X]/).map(s => parseFloat(String(s).trim())).filter(n => !isNaN(n) && n > 0);
+      const boxDimsMm = sizeNums.length === 3 ? { l: sizeNums[0], w: sizeNums[1], h: sizeNums[2] } : null;
+
       packing[String(skuId).trim()] = {
         type,
         unitStr,
         unitNum: m ? parseInt(m[0], 10) : null,
         weightG,
-        palletUnitNum: pm ? parseInt(pm[0], 10) : null, // 파렛트 1개당 최대 수량 (박스규격 확보 전까지 미사용)
+        palletUnitNum: pm ? parseInt(pm[0], 10) : null, // 파렛트 1개당 최대 수량 (미사용, 참고용)
         compositions,
-        barcode: ownBarcode
+        barcode: ownBarcode,
+        boxName,
+        boxDimsMm
       };
       pi++;
     }
@@ -1065,14 +1075,88 @@ function computeBoxCount(total, unit){
   return Math.ceil(total / unit);
 }
 
-// 파렛트 수(잠정) = 총 SKU 무게(kg) ÷ 파렛트 1개당 최대중량(1,000kg), 올림.
-// 쿠팡 팔레트 규격(T11형 1,100x1,100mm, 적재높이 1.7m 이하, 최대중량 1,000kg, 1개 파렛트에 SKU 혼적 가능) 기준.
-// SKU별 박스 규격(가로/세로/높이)이 확정되면 부피 기준 적재 계산으로 정교화 예정 — 그 전까지는 중량 기준 잠정치.
-function estimatePalletCount(totalWeightKg){
-  const PALLET_MAX_WEIGHT_KG = 1000;
-  const w = Number(totalWeightKg) || 0;
-  if(w <= 0) return 0;
-  return Math.ceil(w / PALLET_MAX_WEIGHT_KG);
+// ===== 쿠팡 파렛트 적재리스트 계산 =====
+// 쿠팡 파렛트 규격: T11형 1,100×1,100mm, 적재높이 1.7m 이하(파렛트 높이 포함), 파렛트 1개당 최대중량 1,000kg,
+// 2단 파렛트 적재 금지, 1개 파렛트에 여러 SKU 혼적 가능.
+// ⚠ 아래 부피 계산은 박스가 완전히 밀착 적재된다는 가정의 "잠정 추정치"이며, 실제 박스 형태/적재 방식에 따라
+//    오차가 있을 수 있습니다. 최종 제출 전 반드시 육안으로 파렛트 수를 한 번 더 확인해 주세요.
+const PALLET_MAX_WEIGHT_KG = 1000;
+const PALLET_USABLE_VOLUME_M3 = 1.1 * 1.1 * (1.7 - 0.15); // 파렛트 자체 높이(약150mm) 제외한 순수 적재 가능 부피 상한
+
+function boxVolumeM3(dims){
+  if(!dims) return 0;
+  return (dims.l * dims.w * dims.h) / 1e9;
+}
+
+// 같은 입고예정일+같은 센터의 SKU들을 순서대로 파렛트에 채운다.
+// 규칙: 같은 품목은 파렛트를 나눠 담지 않는다. 단, 그 품목 하나만으로 파렛트 1개 용량(중량 또는 부피)을
+// 초과할 때만 예외적으로 그 품목만 여러 파렛트에 분할한다.
+function packPallets(items){
+  const pallets = [];
+  let cur = null;
+  const startNew = () => { cur = {weightKg:0, volumeM3:0, boxQty:0, items:[]}; pallets.push(cur); };
+
+  items.forEach(it => {
+    const itemWeightKg = (Number(it.totalQty)||0) * (Number(it.weightG)||0) / 1000;
+    const itemVolumeM3 = boxVolumeM3(it.boxDimsMm) * (Number(it.boxQty)||0);
+
+    if(itemWeightKg > PALLET_MAX_WEIGHT_KG || (itemVolumeM3 > 0 && itemVolumeM3 > PALLET_USABLE_VOLUME_M3)){
+      // 이 품목 하나만으로 파렛트 1개를 초과 → 예외적으로 이 품목만 여러 파렛트에 분할
+      const splitBy = Math.max(
+        Math.ceil(itemWeightKg / PALLET_MAX_WEIGHT_KG) || 1,
+        itemVolumeM3 > 0 ? Math.ceil(itemVolumeM3 / PALLET_USABLE_VOLUME_M3) : 1
+      );
+      let remainingQty = it.totalQty, remainingBox = it.boxQty;
+      for(let s=0; s<splitBy; s++){
+        startNew();
+        const isLast = s === splitBy - 1;
+        const qtyChunk = isLast ? remainingQty : Math.round(it.totalQty / splitBy);
+        const boxChunk = isLast ? remainingBox : Math.round(it.boxQty / splitBy);
+        remainingQty -= qtyChunk; remainingBox -= boxChunk;
+        cur.items.push({ skuId: it.skuId, itemName: it.itemName, totalQty: qtyChunk, boxQty: boxChunk, orderNos: it.orderNos });
+        cur.weightKg += qtyChunk * (Number(it.weightG)||0) / 1000;
+        cur.volumeM3 += boxVolumeM3(it.boxDimsMm) * boxChunk;
+        cur.boxQty += boxChunk;
+      }
+      return;
+    }
+
+    if(!cur || (cur.weightKg + itemWeightKg > PALLET_MAX_WEIGHT_KG) || (itemVolumeM3 > 0 && cur.volumeM3 + itemVolumeM3 > PALLET_USABLE_VOLUME_M3)){
+      startNew();
+    }
+    cur.items.push({ skuId: it.skuId, itemName: it.itemName, totalQty: it.totalQty, boxQty: it.boxQty, orderNos: it.orderNos });
+    cur.weightKg += itemWeightKg;
+    cur.volumeM3 += itemVolumeM3;
+    cur.boxQty += it.boxQty;
+  });
+
+  return pallets;
+}
+
+// 발주번호가 달라도 같은 입고예정일+같은 센터면 동일 발주서로 간주해서 그룹화 → 그룹별로 파렛트 배치
+function buildLoadingPlan(rows){
+  const groupMap = {};
+  rows.forEach(r => {
+    const gk = `${r.dk}__${r.center}`;
+    if(!groupMap[gk]) groupMap[gk] = { dk:r.dk, eta:r.eta, center:r.center, itemsBySku:{} };
+    const g = groupMap[gk];
+    if(!g.itemsBySku[r.skuId]){
+      g.itemsBySku[r.skuId] = {
+        skuId: r.skuId, itemName: r.itemName, totalQty:0,
+        unitNum: (masterData.packing[r.skuId] || {}).unitNum ?? null,
+        weightG: r.weightG, boxDimsMm: r.boxDimsMm, orderNos: new Set()
+      };
+    }
+    const it = g.itemsBySku[r.skuId];
+    it.totalQty += Number(r.totalQty)||0;
+    it.orderNos.add(String(r.orderNo));
+  });
+
+  return Object.values(groupMap).map(g => {
+    const items = Object.values(g.itemsBySku).map(it => ({ ...it, boxQty: computeBoxCount(it.totalQty, it.unitNum) }));
+    const pallets = packPallets(items);
+    return { dk: g.dk, eta: g.eta, center: g.center, pallets };
+  });
 }
 
 async function handlePoFileMilkrun(file){
@@ -1120,13 +1204,14 @@ async function handlePoFileMilkrun(file){
       const boxCount = computeBoxCount(qty, unitNum);
       const weightG = pack ? (pack.weightG || 0) : 0;
       const palletUnitNum = pack ? pack.palletUnitNum : null;
+      const boxDimsMm = pack ? pack.boxDimsMm : null;
       dkCount[dk] = (dkCount[dk]||0) + 1;
       centerCount[centerNameRaw] = (centerCount[centerNameRaw]||0) + 1;
 
       outRows.push({
         center: centerNameRaw, orderNo: r[cOrderNo], site:'쿠팡로켓배송', receiver: centerNameRaw,
         eta: etaDate, dk, phone: center.phone, phone2: center.phone, zip: center.zip, addr: center.addr,
-        itemName, boxQty: boxCount, skuId, totalQty: qty, unitStr, remark, weightG, palletUnitNum
+        itemName, boxQty: boxCount, skuId, totalQty: qty, unitStr, remark, weightG, palletUnitNum, boxDimsMm
       });
     }
 
@@ -1152,7 +1237,9 @@ function renderResultMilkrun(){
   const orders = new Set(rows.map(r=>r.orderNo)).size;
   const totalBox = rows.reduce((sum,r)=>sum+(Number(r.boxQty)||0),0);
   const totalWeightKg = rows.reduce((sum,r)=>sum+(Number(r.totalQty)||0)*(Number(r.weightG)||0),0) / 1000;
-  const totalPallets = estimatePalletCount(totalWeightKg);
+  const loadingPlan = buildLoadingPlan(rows);
+  lastResultMr.loadingPlan = loadingPlan;
+  const totalPallets = loadingPlan.reduce((sum,g)=>sum+g.pallets.length,0);
 
   document.getElementById('mrOrders').textContent = orders;
   document.getElementById('mrRows').textContent = rows.length;
@@ -1263,6 +1350,245 @@ async function downloadResultMilkrun(){
   const link=document.createElement('a');
   link.href=url; link.download=fname; link.click();
   URL.revokeObjectURL(url);
+
+  // 참고용 엑셀과 함께 쿠팡 파렛트 적재리스트도 같이 다운로드 (별도 파일 2개)
+  await downloadLoadingList();
+}
+
+// --- STREAMING_CHUNK:쿠팡 파렛트 적재리스트(필수작성) 양식 생성 ---
+// 실제 제출했던 과거 적재리스트(20260902-VF124, 20260814-대구3 등)의 서식(열너비/행높이/병합/테두리/폰트)을
+// openpyxl로 직접 뜯어서 그대로 재현. 병합된 영역은 병합 범위 전체 셀에 테두리를 걸어야 바깥 테두리가
+// 깨지지 않고 온전한 박스로 보이므로, boxBorder 헬퍼로 항상 범위 전체에 적용한다.
+// ExcelJS는 병합된 범위 안의 셀들이 스타일을 공유해서, 셀별로 다른 변(top/bottom/left/right)만
+// 나눠 설정하면 마지막에 쓴 값이 병합 전체를 덮어써버린다(예: 마지막 열의 오른쪽 테두리만 남고
+// 왼쪽 테두리가 사라지는 문제 — 이번에 표가 깨져 보인 원인). 그래서 병합 범위든 단일 셀이든
+// 항상 '앵커 셀(좌상단) 하나'에만 4면 테두리를 통째로 걸어준다. 병합된 셀은 엑셀에서 어차피
+// 하나의 셀처럼 렌더링되므로 앵커에 완전한 박스 테두리를 걸면 시각적으로 온전한 사각형이 된다.
+function boxBorder(ws, r1, c1, thin){
+  ws.getCell(r1,c1).border = { top:thin, bottom:thin, left:thin, right:thin };
+}
+
+// 파렛트 적재 높이(약 155cm, 파렛트 자체 높이 15cm 제외) 안에서 박스 높이를 순서대로 누적해
+// "몇 단째에 어떤 품목이 들어가는지"를 추정한다. 실제 가로/세로 배치까지 고려한 정밀 계산은 아니고,
+// 높이만 순차적으로 쌓는다고 가정한 "현장 참고용" 잠정 추정치다.
+const TIER_HEIGHT_BUDGET_MM = 1550;
+function computeTierGuide(pallet){
+  let tier = 1, used = 0;
+  const tiers = {};
+  const noDims = [];
+  const addToTier = (t, name, count) => {
+    if(!tiers[t]) tiers[t] = [];
+    const found = tiers[t].find(e => e.name === name);
+    if(found) found.count += count; else tiers[t].push({name, count});
+  };
+  pallet.items.forEach(it => {
+    const dims = (masterData.packing[it.skuId] || {}).boxDimsMm;
+    if(!dims || !dims.h){
+      addToTier(tier, `${it.itemName} (박스높이 정보없음)`, it.boxQty);
+      noDims.push(it.itemName);
+      return;
+    }
+    let remaining = it.boxQty;
+    while(remaining > 0){
+      if(used + dims.h > TIER_HEIGHT_BUDGET_MM && used > 0){ tier++; used = 0; continue; }
+      used += dims.h;
+      addToTier(tier, it.itemName, 1);
+      remaining--;
+    }
+  });
+  return { tiers, maxTier: tier, noDims };
+}
+
+async function downloadLoadingList(){
+  if(!lastResultMr || !lastResultMr.loadingPlan) return;
+  const plan = lastResultMr.loadingPlan;
+  const hasVolumeData = plan.some(g => g.pallets.some(p => p.items.some(it => (masterData.packing[it.skuId]||{}).boxDimsMm)));
+
+  const wb = new window.ExcelJS.Workbook();
+  const thin={style:'thin',color:{argb:'FF000000'}};
+  const TIER_COLORS = ['FFFCE4D6','FFDDEBF7','FFE2EFDA','FFFFF2CC','FFEAE1F5'];
+
+  plan.forEach(g => {
+    const sheetName = `20${g.dk}-${g.center}`.slice(0, 31);
+    const ws = wb.addWorksheet(sheetName);
+    ws.views = [{ showGridLines: false }];
+    // 참고 파일 실측 열너비 그대로 재현
+    [[1,2.25],[2,1],[3,6.125],[4,4.375],[5,1.25],[6,11.25],[7,8.43],[8,17.875],[9,8.43],[10,5.125],[11,9.625],[12,7.5],[13,1]]
+      .forEach(([c,w]) => { ws.getColumn(c).width = w; });
+
+    let row = 1;
+    const etaLabel = String(g.eta||'').match(/(\d{4})-(\d{2})-(\d{2})/);
+    const etaText = etaLabel ? `${etaLabel[2]}월 ${etaLabel[3]}일` : String(g.eta||'');
+
+    const addBlock = (palletIdx, total, pallet) => {
+      const boxTotal = pallet.items.reduce((s,it)=>s+(Number(it.boxQty)||0),0);
+      const orderNosStr = [...new Set(pallet.items.flatMap(it => [...it.orderNos]))].join(',');
+
+      // 제목 (D:K 병합, 20pt bold, 밑줄 테두리만)
+      ws.mergeCells(row,4,row,11);
+      ws.getRow(row).height = 48.75;
+      const titleCell = ws.getCell(row,4);
+      titleCell.value = '쿠팡 파렛트 적재리스트(필수작성)';
+      titleCell.font = {name:'맑은 고딕', size:20, bold:true};
+      titleCell.alignment = {horizontal:'center', vertical:'middle'};
+      for(let c=4;c<=11;c++) ws.getCell(row,c).border = {bottom:thin};
+      row += 2;
+
+      // "총 - 현재" (C:D 병합)
+      ws.mergeCells(row,3,row,4);
+      ws.getCell(row,3).value = `${total}   -   ${palletIdx}`;
+      ws.getCell(row,3).font = {name:'맑은 고딕', size:11, bold:true};
+      ws.getCell(row,3).alignment = {horizontal:'left', vertical:'center'};
+      row++;
+
+      // 입고예정일자 / 박스수량
+      ws.getCell(row,3).value = '입고예정일자 :';
+      ws.getCell(row,3).font = {name:'맑은 고딕', size:10, bold:true};
+      ws.getCell(row,3).alignment = {horizontal:'left', vertical:'center'};
+      ws.getCell(row,6).value = etaText;
+      ws.getCell(row,6).font = {name:'맑은 고딕', size:11, bold:true};
+      ws.getCell(row,6).alignment = {horizontal:'center', vertical:'center'};
+      ws.getCell(row,8).value = '/';
+      ws.getCell(row,9).value = '박스수량 :';
+      ws.getCell(row,9).font = {name:'맑은 고딕', size:10, bold:true};
+      ws.getCell(row,9).alignment = {horizontal:'right', vertical:'center'};
+      ws.mergeCells(row,10,row,12);
+      ws.getCell(row,10).value = boxTotal;
+      ws.getCell(row,10).font = {name:'맑은 고딕', size:11, bold:true};
+      ws.getCell(row,10).alignment = {horizontal:'left', vertical:'center'};
+      ws.getCell(row,10).numFmt = '#,##0" BOX"';
+      row++;
+
+      // 업체명 / 납품센터명
+      ws.getCell(row,3).value = '업체명 :';
+      ws.getCell(row,3).font = {name:'맑은 고딕', size:10, bold:true};
+      ws.getCell(row,3).alignment = {horizontal:'left', vertical:'center'};
+      ws.getCell(row,6).value = '요미몬 ㈜';
+      ws.getCell(row,6).font = {name:'맑은 고딕', size:11, bold:true};
+      ws.getCell(row,6).alignment = {horizontal:'center', vertical:'center'};
+      ws.getCell(row,8).value = '/';
+      ws.getCell(row,9).value = '납품센터명 :';
+      ws.getCell(row,9).font = {name:'맑은 고딕', size:10, bold:true};
+      ws.getCell(row,9).alignment = {horizontal:'right', vertical:'center'};
+      ws.mergeCells(row,10,row,12);
+      ws.getCell(row,10).value = g.center;
+      ws.getCell(row,10).font = {name:'맑은 고딕', size:11, bold:true};
+      ws.getCell(row,10).alignment = {horizontal:'left', vertical:'center'};
+      row++;
+
+      // 발주번호
+      ws.getCell(row,3).value = '발주번호 :';
+      ws.getCell(row,3).font = {name:'맑은 고딕', size:10, bold:true};
+      ws.getCell(row,3).alignment = {horizontal:'left', vertical:'center'};
+      ws.getCell(row,6).value = orderNosStr;
+      ws.getCell(row,6).font = {name:'맑은 고딕', size:11, bold:true};
+      row += 2;
+
+      // 표 헤더 (C=NO, D:F=SKU No., G:I=SKU NAME, J:K=BOX 수량, L=수량)
+      ws.getRow(row).height = 27;
+      ws.mergeCells(row,4,row,6); ws.mergeCells(row,7,row,9); ws.mergeCells(row,10,row,11);
+      const headerMap = [[3,3,'NO'],[4,6,'SKU No.'],[7,9,'SKU NAME'],[10,11,'BOX 수량'],[12,12,'수량']];
+      headerMap.forEach(([c1,c2,label]) => {
+        const cell = ws.getCell(row,c1);
+        cell.value = label;
+        cell.font = {name:'맑은 고딕', size:11, bold:false};
+        cell.alignment = {horizontal:'center', vertical:'center'};
+        boxBorder(ws, row, c1, thin);
+      });
+      row++;
+
+      pallet.items.forEach((it, i) => {
+        ws.getRow(row).height = 24.75;
+        ws.mergeCells(row,4,row,6); ws.mergeCells(row,7,row,9); ws.mergeCells(row,10,row,11);
+
+        ws.getCell(row,3).value = i+1;
+        ws.getCell(row,4).value = Number(it.skuId) || it.skuId;
+        ws.getCell(row,7).value = it.itemName;
+        ws.getCell(row,7).font = {name:'맑은 고딕', size:9, bold:false};
+        ws.getCell(row,10).value = it.boxQty;
+        ws.getCell(row,12).value = it.totalQty;
+
+        [3,4,10,12].forEach(c => {
+          ws.getCell(row,c).font = {name:'맑은 고딕', size:11, bold:false};
+        });
+        [3,4,7,10,12].forEach(c => {
+          ws.getCell(row,c).alignment = {horizontal:'center', vertical:'center'};
+        });
+        boxBorder(ws, row, 3, thin);
+        boxBorder(ws, row, 4, thin);
+        boxBorder(ws, row, 7, thin);
+        boxBorder(ws, row, 10, thin);
+        boxBorder(ws, row, 12, thin);
+        row++;
+      });
+      row += 2;
+    };
+
+    g.pallets.forEach((pallet, idx) => {
+      // 기존 실제 제출 파일과 동일하게 같은 블록을 2회 반복해서 넣는다
+      addBlock(idx+1, g.pallets.length, pallet);
+      addBlock(idx+1, g.pallets.length, pallet);
+    });
+
+    // --- 현장 참고용: 파렛트별 1단/2단/3단... 적재 단수 가이드 시트 ---
+    const guideSheetName = `${sheetName} 참고`.slice(0, 31);
+    const gws = wb.addWorksheet(guideSheetName);
+    gws.views = [{ showGridLines: false }];
+    gws.getColumn(1).width = 4; gws.getColumn(2).width = 10; gws.getColumn(3).width = 46; gws.getColumn(4).width = 10;
+
+    let grow = 1;
+    gws.mergeCells(grow,1,grow,4);
+    gws.getCell(grow,1).value = `현장 참고용 — ${g.center} / ${etaText} 파렛트 적재 단수(추정) 가이드`;
+    gws.getCell(grow,1).font = {name:'맑은 고딕', size:14, bold:true};
+    gws.getCell(grow,1).alignment = {horizontal:'left', vertical:'center'};
+    grow += 1;
+    gws.mergeCells(grow,1,grow,4);
+    gws.getCell(grow,1).value = '※ 박스 높이만 순서대로 쌓는다고 가정한 잠정 추정치입니다. 실제 적재는 현장 여건(박스 형태 등)에 맞춰 조정해 주세요.';
+    gws.getCell(grow,1).font = {name:'맑은 고딕', size:9, italic:true, color:{argb:'FF8ea2b4'}};
+    grow += 2;
+
+    g.pallets.forEach((pallet, pIdx) => {
+      const guide = computeTierGuide(pallet);
+      gws.mergeCells(grow,1,grow,4);
+      gws.getCell(grow,1).value = `▶ 파렛트 ${pIdx+1} / ${g.pallets.length}  (총 ${guide.maxTier}단 예상)`;
+      gws.getCell(grow,1).fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF1A232D'}};
+      gws.getCell(grow,1).font = {name:'맑은 고딕', size:12, bold:true, color:{argb:'FFFFFFFF'}};
+      grow++;
+
+      for(let t = guide.maxTier; t >= 1; t--){ // 위쪽 단부터 보기 좋게 역순으로 표시 (시각적으로 쌓인 순서)
+        const entries = guide.tiers[t] || [];
+        if(!entries.length) continue;
+        const color = TIER_COLORS[(t-1) % TIER_COLORS.length];
+        const startRow = grow;
+        entries.forEach((e, ei) => {
+          gws.getCell(grow,1).value = ei===0 ? `${t}단` : '';
+          gws.getCell(grow,1).font = {name:'맑은 고딕', size:11, bold:true};
+          gws.getCell(grow,1).alignment = {horizontal:'center', vertical:'center'};
+          gws.getCell(grow,3).value = e.name;
+          gws.getCell(grow,4).value = `${e.count}박스`;
+          gws.getCell(grow,4).alignment = {horizontal:'center'};
+          for(let c=1;c<=4;c++){
+            gws.getCell(grow,c).fill = {type:'pattern', pattern:'solid', fgColor:{argb:color}};
+            gws.getCell(grow,c).border = {top:thin,bottom:thin,left:thin,right:thin};
+          }
+          grow++;
+        });
+        if(entries.length > 1) gws.mergeCells(startRow, 1, grow-1, 1);
+      }
+      grow++;
+    });
+  });
+
+  if(!hasVolumeData){
+    alert("⚠ 일부 SKU에 '박스 크기(mm)' 정보가 없어, 해당 품목은 중량 기준으로만 파렛트를 배정했습니다.\n(부피 초과 여부는 반영되지 않았을 수 있어요)\n제출 전 파렛트 수를 한 번 더 육안으로 확인해 주세요.");
+  }
+
+  const fname2 = `쿠팡 파렛트 적재리스트_${lastResultMr.dk}_밀크런-${lastResultMr.center}.xlsx`;
+  const buffer2 = await wb.xlsx.writeBuffer();
+  const url2=URL.createObjectURL(new Blob([buffer2],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+  const link2=document.createElement('a');
+  link2.href=url2; link2.download=fname2; link2.click();
+  URL.revokeObjectURL(url2);
 }
 
 // --- STREAMING_CHUNK:WEEKEEP(위킵) B2B 업로드 엑셀 생성 ---
@@ -1331,10 +1657,6 @@ async function downloadResultWeekeepMilkrun(){
   ws.getRow(1).font = {name:'맑은 고딕', size:10, bold:true};
   ws.getRow(1).alignment = {horizontal:'center', vertical:'middle', wrapText:true};
   ws.columns.forEach(col => { col.width = 16; });
-
-  // E,F,H,I,O~T열은 삭제하지 않고 숨김 처리만 (엑셀 원본 열 구조는 유지)
-  const hiddenCols = [5,6,8,9,15,16,17,18,19,20]; // 1-based: E,F,H,I,O,P,Q,R,S,T
-  hiddenCols.forEach(c => { ws.getColumn(c).hidden = true; });
 
   const fname = `위킵 업로드_밀크런-${lastResultMr.center}_(${lastResultMr.dk}).xlsx`;
   const buffer=await wb.xlsx.writeBuffer();
