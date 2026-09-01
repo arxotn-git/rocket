@@ -19,6 +19,8 @@
     --sub:#8ea2b4;
     --amber:#ffb020;
     --amber-dim:#7a5a1c;
+    --teal:#22d3ee;
+    --teal-dim:#1a6b78;
     --ok:#3ecf8e;
     --warn:#ff5d5d;
     --mono:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;
@@ -61,11 +63,16 @@
   .drop .t1{font-size:13.5px; font-weight:600;}
   .drop .t2{font-size:11.5px; color:var(--sub); margin-top:3px; font-family:var(--mono);}
   
-  /* STEP 2 PO 업로드 영역 시각적 강조 (쉽먼트 / 밀크런 공통) */
-  #dropPo, #dropPoMr { border: 2px dashed var(--amber); background: rgba(255,176,32,.06); padding: 32px 22px; }
-  #dropPo:hover, #dropPo.drag, #dropPoMr:hover, #dropPoMr.drag { background: rgba(255,176,32,.12); }
-  #dropPo .ic, #dropPoMr .ic { font-size: 28px; color: var(--amber); opacity: 1; }
-  #dropPo .t1, #dropPoMr .t1 { font-size: 15px; color: var(--amber); }
+  /* STEP 2 PO 업로드 영역 시각적 강조 (택배=amber, 밀크런=teal로 색상 구분) */
+  #dropPo { border: 2px dashed var(--amber); background: rgba(255,176,32,.06); padding: 32px 22px; }
+  #dropPo:hover, #dropPo.drag { background: rgba(255,176,32,.12); }
+  #dropPo .ic { font-size: 28px; color: var(--amber); opacity: 1; }
+  #dropPo .t1 { font-size: 15px; color: var(--amber); }
+
+  #dropPoMr { border: 2px dashed var(--teal); background: rgba(34,211,238,.07); padding: 32px 22px; }
+  #dropPoMr:hover, #dropPoMr.drag { background: rgba(34,211,238,.13); }
+  #dropPoMr .ic { font-size: 28px; color: var(--teal); opacity: 1; }
+  #dropPoMr .t1 { font-size: 15px; color: var(--teal); }
 
   input[type=file]{display:none;}
 
@@ -125,13 +132,15 @@
   .filename{font-family:var(--mono); font-size:12px; color:var(--sub);}
 
   .locked{opacity:.4; pointer-events:none;}
-  .tabbar{display:flex; gap:8px; margin:22px 0 18px;}
+  .tabbar{display:flex; gap:10px; margin:24px 0 20px;}
   .tabbtn{
-    flex:1; background:var(--panel); border:1px solid var(--line); color:var(--sub);
-    font-weight:700; font-size:13.5px; padding:12px 16px; border-radius:9px; cursor:pointer; transition:.12s;
+    flex:1; background:var(--panel); border:2px solid var(--line); color:var(--sub);
+    font-weight:800; font-size:16px; padding:18px 20px; border-radius:11px; cursor:pointer; transition:.12s;
   }
   .tabbtn:hover{border-color:var(--amber); color:var(--text);}
-  .tabbtn.active{background:rgba(255,176,32,.1); border-color:var(--amber); color:var(--amber);}
+  .tabbtn.active{background:rgba(255,176,32,.12); border-color:var(--amber); color:var(--amber); box-shadow:0 4px 16px rgba(255,176,32,.18);}
+  #tabBtnMilkrun:hover{border-color:var(--teal); color:var(--text);}
+  #tabBtnMilkrun.active{background:rgba(34,211,238,.12); border-color:var(--teal); color:var(--teal); box-shadow:0 4px 16px rgba(34,211,238,.18);}
   code{font-family:var(--mono); font-size:11.5px; background:var(--panel2); border:1px solid var(--line); padding:1px 5px; border-radius:3px; color:var(--amber);}
   input[type=text].editname{
     background:var(--panel2); border:1px solid var(--line); color:var(--text); font-family:var(--mono);
@@ -146,7 +155,7 @@
 <div class="wrap">
 
   <span class="tag">● Coupang Rocket 택배</span>
-  <h1>로켓배송 발주서 자동화 <span style="color:#8c9eff; font-weight:700; font-size:19px; margin-left:4px;">(v11)</span> <span style="font-size:12px; color:var(--sub); font-weight:400; margin-left:8px; letter-spacing:0;">최근 수정: 2026-08-31 (세트상품 그룹 무게 인식 버그 수정, 파렛트 수를 중량기준 잠정치로 변경)</span></h1>
+  <h1>로켓배송 발주서 자동화 <span style="color:#8c9eff; font-weight:700; font-size:19px; margin-left:4px;">(v13)</span> <span style="font-size:12px; color:var(--sub); font-weight:400; margin-left:8px; letter-spacing:0;">최근 수정: 2026-09-01 14:30 (UI 정리: 탭/드롭존 색상 구분, 위킵용 다운로드 버튼 강조, 컬럼 숨김 처리)</span></h1>
   <p class="sub">로켓택배(쉽먼트)와 로켓 밀크런(용차) 발주서를 탭으로 나눠서 처리합니다. 마스터 데이터는 두 탭이 공용으로 사용합니다.</p>
 
   <!-- STEP 1: 마스터 데이터 -->
@@ -173,10 +182,10 @@
 
     <div class="status-row"><span class="dot" id="masterDot"></span><span id="masterStatus">클라우드 마스터 데이터 연결 중...</span></div>
 
-    <div class="kv" id="masterStats" style="display:none;">
-      <div class="cell"><div class="n" id="mProducts">0</div><div class="l">상품 매핑 (SKU)</div></div>
-      <div class="cell"><div class="n" id="mCenters">0</div><div class="l">센터 매핑</div></div>
-      <div class="cell"><div class="n" id="mPacking">0</div><div class="l">포장정보 매핑</div></div>
+    <div class="status-row" id="masterStats" style="display:none; gap:16px;">
+      <span>📦 상품 매핑 <b style="color:var(--amber); font-family:var(--mono);" id="mProducts">0</b>건</span>
+      <span>🏢 센터 매핑 <b style="color:var(--amber); font-family:var(--mono);" id="mCenters">0</b>건</span>
+      <span>📮 포장정보 매핑 <b style="color:var(--amber); font-family:var(--mono);" id="mPacking">0</b>건</span>
     </div>
 
     <div class="status-row" style="margin-top:14px; padding-top:12px; border-top:1px solid var(--line);">
@@ -375,6 +384,7 @@
       <div class="footer-actions">
         <button class="btn" id="btnDownloadMr">📥 참고용 엑셀 다운로드</button>
         <span class="filename" id="mrDlFilename"></span>
+        <button class="btn" id="btnDownloadWeekeep" style="margin-left:auto; background:var(--teal); color:#062226;">📤 위킵용 엑셀 다운로드</button>
       </div>
     </div>
   </div><!-- /tab-milkrun -->
@@ -565,7 +575,8 @@ function renderMasterStatus(){
   if(masterData && masterData.products){
     dot.classList.add('on');
     const d = masterData.updatedAt ? new Date(masterData.updatedAt).toLocaleString('ko-KR') : '';
-    status.textContent = `파이어베이스 클라우드 마스터 데이터 연동 완료 (갱신: ${d})`;
+    const wkCount = masterData.weekeepByBarcode ? Object.keys(masterData.weekeepByBarcode).length : 0;
+    status.textContent = `파이어베이스 클라우드 마스터 데이터 연동 완료 (갱신: ${d})` + (wkCount>0 ? ` · 위킵상품정보 ${wkCount}건 인식` : '');
     stats.style.display = 'flex';
     document.getElementById('mProducts').textContent = Object.keys(masterData.products).length;
     document.getElementById('mCenters').textContent = Object.keys(masterData.centers).length;
@@ -614,6 +625,7 @@ async function handleMasterFile(file){
     const wb = await readWorkbook(file);
     const prodSheetName = findSheetName(wb, '상품,센터정보');
     const packSheetName = findSheetName(wb, '포장정보');
+    const weekeepSheetName = findSheetName(wb, '위킵상품정보');
     if(!prodSheetName || !packSheetName){
       alert("이 파일에서 '상품,센터정보' 또는 '포장정보' 시트를 찾지 못했습니다.\n기존에 쓰시던 로켓-택배 매크로 xlsm 파일을 올려주세요.");
       renderMasterStatus();
@@ -676,17 +688,57 @@ async function handleMasterFile(file){
         pj++;
       }
 
+      // 구성(F열) 목록 수집 — 그룹 내 모든 행에서 텍스트를 모음 (세트상품 위킵 매칭용)
+      const compositions = [];
+      let pk = pi;
+      while(pk < packRows.length){
+        const rr = packRows[pk];
+        if(pk > pi && rr && rr[1] != null && rr[1] !== '') break;
+        if(rr && rr[5] != null && String(rr[5]).trim() !== ''){
+          compositions.push(String(rr[5]).trim());
+        }
+        pk++;
+      }
+      const ownBarcode = r[2] != null ? String(r[2]).trim() : '';
+
       packing[String(skuId).trim()] = {
         type,
         unitStr,
         unitNum: m ? parseInt(m[0], 10) : null,
         weightG,
-        palletUnitNum: pm ? parseInt(pm[0], 10) : null // 파렛트 1개당 최대 수량 (박스규격 확보 전까지 미사용)
+        palletUnitNum: pm ? parseInt(pm[0], 10) : null, // 파렛트 1개당 최대 수량 (박스규격 확보 전까지 미사용)
+        compositions,
+        barcode: ownBarcode
       };
       pi++;
     }
 
-    masterData = { products, centers, packing, updatedAt: Date.now() };
+    // 세트상품의 구성요소별 바코드 매칭용: 구성(F열) 텍스트가 1개뿐인 '단일상품' 행들만
+    // "구성텍스트 → 그 상품 자신의 바코드"로 매핑해둔다. (세트상품의 구성 하위 텍스트도 결국
+    // 어딘가엔 단일상품으로 존재하므로, 그 상품의 바코드를 그대로 재사용할 수 있음)
+    const compositionBarcode = {};
+    Object.values(packing).forEach(p => {
+      if(p.compositions.length === 1 && p.barcode){
+        compositionBarcode[p.compositions[0]] = p.barcode;
+      }
+    });
+
+    // 위킵상품정보 시트(선택) — 고객사바코드 → 위킵 SKU번호/상품관리명 매칭용
+    const weekeepByBarcode = {};
+    if(weekeepSheetName){
+      const wkRows = sheetRows(wb, weekeepSheetName);
+      for(let i=1; i<wkRows.length; i++){
+        const r2 = wkRows[i]; if(!r2) continue;
+        const barcode = r2[19] != null ? String(r2[19]).trim() : '';
+        if(!barcode) continue;
+        weekeepByBarcode[barcode] = {
+          skuNo: r2[10] != null ? String(r2[10]).trim() : '',
+          name: r2[9] != null ? String(r2[9]).trim() : ''
+        };
+      }
+    }
+
+    masterData = { products, centers, packing, compositionBarcode, weekeepByBarcode, updatedAt: Date.now() };
     
     // 1. 계산용 JSON 데이터 최신화
     await setDoc(doc(db, "rocket_data", "master"), masterData);
@@ -1213,6 +1265,85 @@ async function downloadResultMilkrun(){
   URL.revokeObjectURL(url);
 }
 
+// --- STREAMING_CHUNK:WEEKEEP(위킵) B2B 업로드 엑셀 생성 ---
+const WEEKEEP_HEADER = [
+  '주문번호\n주문을 구분할 임의의 번호','주문상품명','SKU번호','제조일\n로트시리얼만 사용','유효일\n로트시리얼만 사용',
+  '고객사로트번호\n로트시리얼만 사용','수량','판매단가','판매금액','수령자','전화','핸드폰','우편번호','주소',
+  '배송메세지','배송비','배송주문','배송차량','배송업체명','배송업체연락처','발송예정일'
+];
+
+// 세트상품(구성 여러 개)은 구성요소별로 행을 나누고, 각 구성요소의 바코드로 위킵상품정보를 매칭해 SKU번호를 채운다.
+// 매칭 실패(바코드를 못 찾거나 위킵상품정보에 없음)한 구성요소는 unresolved에 기록해서 경고로 보여준다.
+function buildWeekeepRows(lastResultMr){
+  const rows = [];
+  const unresolved = [];
+  lastResultMr.rows.forEach(r => {
+    const pack = masterData.packing[r.skuId];
+    const compositions = (pack && pack.compositions && pack.compositions.length) ? pack.compositions : [r.itemName];
+
+    compositions.forEach(compText => {
+      // 구성요소가 1개뿐인 단일상품이면 그 SKU 자기 자신의 바코드를 바로 사용, 세트면 구성텍스트로 재조회
+      let barcode = (compositions.length === 1 && pack && pack.barcode) ? pack.barcode : (masterData.compositionBarcode || {})[compText];
+      const wk = barcode ? (masterData.weekeepByBarcode || {})[barcode] : null;
+
+      if(!wk){
+        unresolved.push(`${r.itemName} — 구성 "${compText}" (바코드 ${barcode || '미확인'})`);
+      }
+
+      rows.push({
+        orderNo: r.orderNo, itemName: r.itemName,
+        weekeepSku: wk ? wk.skuNo : '',
+        weekeepName: wk ? wk.name : compText, // 매칭 실패 시에도 육안 확인용으로 구성 텍스트는 채워둠
+        qty: r.totalQty,
+        receiver: r.receiver, phone: r.phone, phone2: r.phone2, zip: r.zip, addr: r.addr,
+        sendDate: String(r.eta || '').replace(/-/g,'')
+      });
+    });
+  });
+  return { rows, unresolved };
+}
+
+async function downloadResultWeekeepMilkrun(){
+  if(!lastResultMr) return;
+  if(!masterData || !masterData.weekeepByBarcode || !Object.keys(masterData.weekeepByBarcode).length){
+    alert("마스터 데이터에서 '위킵상품정보' 시트를 찾지 못했습니다.\n로켓배송 마스터 파일에 '위킵상품정보' 시트를 추가한 뒤 STEP1에서 다시 업로드해 주세요.");
+    return;
+  }
+
+  const { rows, unresolved } = buildWeekeepRows(lastResultMr);
+
+  if(unresolved.length){
+    alert('⚠ 위킵 SKU 매칭에 실패한 구성요소가 있습니다. 엑셀은 생성되며, 해당 SKU번호 칸은 비어있습니다.\n\n' + unresolved.join('\n'));
+  }
+
+  const aoa = [WEEKEEP_HEADER];
+  rows.forEach(r => {
+    aoa.push([
+      r.orderNo, r.itemName, r.weekeepSku, r.weekeepName, '', '',
+      r.qty, '', '', r.receiver, r.phone, r.phone2, r.zip, r.addr,
+      '', '', '', '', '', '', Number(r.sendDate) || r.sendDate
+    ]);
+  });
+
+  const wb = new window.ExcelJS.Workbook();
+  const ws = wb.addWorksheet('업로드');
+  ws.addRows(aoa);
+  ws.getRow(1).font = {name:'맑은 고딕', size:10, bold:true};
+  ws.getRow(1).alignment = {horizontal:'center', vertical:'middle', wrapText:true};
+  ws.columns.forEach(col => { col.width = 16; });
+
+  // E,F,H,I,O~T열은 삭제하지 않고 숨김 처리만 (엑셀 원본 열 구조는 유지)
+  const hiddenCols = [5,6,8,9,15,16,17,18,19,20]; // 1-based: E,F,H,I,O,P,Q,R,S,T
+  hiddenCols.forEach(c => { ws.getColumn(c).hidden = true; });
+
+  const fname = `위킵 업로드_밀크런-${lastResultMr.center}_(${lastResultMr.dk}).xlsx`;
+  const buffer=await wb.xlsx.writeBuffer();
+  const url=URL.createObjectURL(new Blob([buffer],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+  const link=document.createElement('a');
+  link.href=url; link.download=fname; link.click();
+  URL.revokeObjectURL(url);
+}
+
 // --- STREAMING_CHUNK:STEP4 Invoice Matching Logic... ---
 async function handleInvoiceFile(file){
   document.getElementById('invoiceStatus').textContent = '읽는 중...';
@@ -1625,6 +1756,7 @@ wireDropzone('dropPoMr','filePoMr', f => {
   handlePoFileMilkrun(f);
 });
 document.getElementById('btnDownloadMr').addEventListener('click', downloadResultMilkrun);
+document.getElementById('btnDownloadWeekeep').addEventListener('click', downloadResultWeekeepMilkrun);
 
 // 탭 전환 (로켓택배 ↔ 로켓 밀크런)
 (function wireTabs(){
