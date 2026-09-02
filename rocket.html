@@ -155,7 +155,7 @@
 <div class="wrap">
 
   <span class="tag">● Coupang Rocket 택배</span>
-  <h1>로켓배송 발주서 자동화 <span style="color:#8c9eff; font-weight:700; font-size:19px; margin-left:4px;">(v20)</span> <span style="font-size:12px; color:var(--sub); font-weight:400; margin-left:8px; letter-spacing:0;">최근 수정: 2026-09-04 (센터별 소계 정렬을 아래 상세표와 동일하게 맞춤)</span></h1>
+  <h1>로켓배송 발주서 자동화 <span style="color:#8c9eff; font-weight:700; font-size:19px; margin-left:4px;">(v17)</span> <span style="font-size:12px; color:var(--sub); font-weight:400; margin-left:8px; letter-spacing:0;">최근 수정: 2026-09-04 (STEP5 센터명 인식: 숫자 없는 센터명(예: 호법)도 인식되도록 수정)</span></h1>
   <p class="sub">로켓택배(쉽먼트)와 로켓 밀크런(용차) 발주서를 탭으로 나눠서 처리합니다. 마스터 데이터는 두 탭이 공용으로 사용합니다.</p>
 
   <!-- STEP 1: 마스터 데이터 -->
@@ -366,8 +366,6 @@
         <div class="cell"><div class="n" id="mrTotalWeight">0</div><div class="l">총 SKU 무게(kg)</div></div>
         <div class="cell"><div class="n" id="mrPallets">0</div><div class="l">총 파렛트 수</div></div>
       </div>
-
-      <div id="mrCenterBreakdown" style="margin-top:10px;"></div>
 
       <div id="mrWarnArea"></div>
 
@@ -616,14 +614,6 @@ function sheetRows(wb, name){
   return window.XLSX.utils.sheet_to_json(sh, {header:1, defval:null, raw:false});
 }
 
-// sheetRows가 raw:false로 읽기 때문에, 셀 서식이 "#,##0"처럼 천단위 콤마 표시로 돼 있으면
-// 값이 "1,150" 같은 문자열로 넘어와서 Number()가 NaN을 반환해버린다(무게 0.0 버그의 원인).
-// 숫자 파싱은 전부 이 함수를 거쳐서 콤마를 먼저 제거한다.
-function parseNum(v){
-  if(v == null || v === '') return NaN;
-  return Number(String(v).replace(/,/g, '').trim());
-}
-
 function findSheetName(wb, target){
   return wb.SheetNames.find(n => n.replace(/\s/g,'') === target.replace(/\s/g,''));
 }
@@ -689,9 +679,9 @@ async function handleMasterFile(file){
       const skuId = r[1];
       const type = r[6] != null ? String(r[6]).trim() : '';   
       const unitStr = r[7] != null ? String(r[7]).trim() : ''; 
-      const m = unitStr.match(/\d[\d,]*/);
+      const m = unitStr.match(/\d+/);
       const palletUnitStr = r[palletColIdx] != null ? String(r[palletColIdx]).trim() : '';
-      const pm = palletUnitStr.match(/\d[\d,]*/);
+      const pm = palletUnitStr.match(/\d+/);
 
       // 세트상품은 SKU 행(SKU ID 있는 행) 자체가 아니라, 셀 테두리로만 구분된 하위 '구성' 행들 중
       // 한 곳에만 무게가 입력돼 있을 수 있음 → 다음 SKU 행이 나오기 전까지 그룹 전체를 훑어서 무게를 찾는다.
@@ -701,7 +691,7 @@ async function handleMasterFile(file){
         const rr = packRows[pj];
         if(pj > pi && rr && rr[1] != null && rr[1] !== '') break; // 다음 SKU 행이면 그룹 종료
         if(rr && rr[weightColIdx] != null && rr[weightColIdx] !== ''){
-          const w = parseNum(rr[weightColIdx]);
+          const w = Number(rr[weightColIdx]);
           if(!isNaN(w) && w > 0){ weightG = w; break; }
         }
         pj++;
@@ -744,9 +734,9 @@ async function handleMasterFile(file){
       packing[String(skuId).trim()] = {
         type,
         unitStr,
-        unitNum: m ? parseInt(m[0].replace(/,/g,''), 10) : null,
+        unitNum: m ? parseInt(m[0], 10) : null,
         weightG,
-        palletUnitNum: pm ? parseInt(pm[0].replace(/,/g,''), 10) : null, // 파렛트 1개당 최대 수량 (미사용, 참고용)
+        palletUnitNum: pm ? parseInt(pm[0], 10) : null, // 파렛트 1개당 최대 수량 (미사용, 참고용)
         compositions,
         barcode: ownBarcode,
         boxName,
@@ -866,7 +856,7 @@ async function handlePoFile(file){
     for(let i=1; i<rows.length; i++){
       const r = rows[i]; if(!r || r[cOrderNo]==null) continue;
       const status = cStatus>=0 ? r[cStatus] : null;
-      const qty = parseNum(r[cConfirmQty]) || 0;
+      const qty = Number(r[cConfirmQty]) || 0;
       if(qty <= 0) continue;
 
       const centerNameRaw = r[cCenter] != null ? String(r[cCenter]).trim() : '';
@@ -1035,7 +1025,7 @@ async function downloadResult(){
   ws.addRows(aoa);
   
   const widths=[17.75,12,13.625,12,11.625,12.25,13.875,9.25,37.5,5.25,7.5,8,8,5.625,37.5,13.625,4.5,10.75,12,13.625,24.875,52.125];
-  const hiddenCols=new Set([2,5,6,7,8,9,10,11,12,13,16,17]); // F~I열(받는분전화번호~받는분주소) 숨김 처리
+  const hiddenCols=new Set([2,6,9,10,11,12,13,16,17]); 
   widths.forEach((width, i)=>{
     const col=ws.getColumn(i+1);
     col.width=width;
@@ -1215,7 +1205,7 @@ async function handlePoFileMilkrun(file){
 
     for(let i=1; i<rows.length; i++){
       const r = rows[i]; if(!r || r[cOrderNo]==null) continue;
-      const qty = parseNum(r[cConfirmQty]) || 0;
+      const qty = Number(r[cConfirmQty]) || 0;
       if(qty <= 0) continue;
 
       const centerNameRaw = r[cCenter] != null ? String(r[cCenter]).trim() : '';
@@ -1278,31 +1268,6 @@ function renderResultMilkrun(){
   document.getElementById('mrTotalBox').textContent = totalBox;
   document.getElementById('mrTotalWeight').textContent = totalWeightKg.toLocaleString('ko-KR', {maximumFractionDigits:1, minimumFractionDigits:1});
   document.getElementById('mrPallets').textContent = totalPallets;
-
-  // 센터별로 접수하는 경우가 많아서 총합만으로는 불편함 → 센터별(정확히는 발송예정일+센터 그룹별) 소계도 같이 보여준다
-  // loadingPlan은 buildLoadingPlan에서 Map으로 만들어서 rows에 처음 등장하는 순서를 그대로 유지하므로,
-  // 아래 물류센터별 상세 표와 정렬 순서를 맞추려면 별도로 정렬하지 않는다.
-  const centerBreakdown = loadingPlan.map(g => {
-    const groupRows = rows.filter(r => r.dk === g.dk && r.center === g.center);
-    const gBox = groupRows.reduce((s,r)=>s+(Number(r.boxQty)||0),0);
-    const gWeight = groupRows.reduce((s,r)=>s+(Number(r.totalQty)||0)*(Number(r.weightG)||0),0) / 1000;
-    return { center: g.center, eta: g.eta, skuRows: groupRows.length, box: gBox, weight: gWeight, pallets: g.pallets.length };
-  });
-
-  const bdEl = document.getElementById('mrCenterBreakdown');
-  if(centerBreakdown.length > 1){
-    let html = '<div class="tbl-wrap"><table><thead><tr>'
-      + '<th>센터</th><th>입고예정일</th><th>SKU 행수</th><th>박스수량</th><th>무게(kg)</th><th>파렛트 수</th>'
-      + '</tr></thead><tbody>';
-    centerBreakdown.forEach(b => {
-      html += `<tr><td class="center-label">${b.center}</td><td>${b.eta}</td><td>${b.skuRows}</td><td>${b.box}</td>`
-        + `<td>${b.weight.toLocaleString('ko-KR',{maximumFractionDigits:1,minimumFractionDigits:1})}</td><td>${b.pallets}</td></tr>`;
-    });
-    html += '</tbody></table></div>';
-    bdEl.innerHTML = html;
-  } else {
-    bdEl.innerHTML = '';
-  }
 
   const warnArea = document.getElementById('mrWarnArea');
   warnArea.innerHTML = '';
@@ -1401,7 +1366,7 @@ async function downloadResultMilkrun(){
     ]
   });
 
-  const fname = `입고예정일_${lastResultMr.dk}_밀크런${centerLabelSuffix(lastResultMr.rows)} - 참고용.xlsx`;
+  const fname = `입고예정일_${lastResultMr.dk}_밀크런-${lastResultMr.center} - 참고용.xlsx`;
   const buffer=await wb.xlsx.writeBuffer();
   const url=URL.createObjectURL(new Blob([buffer],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
   const link=document.createElement('a');
@@ -1425,59 +1390,35 @@ function boxBorder(ws, r1, c1, thin){
   ws.getCell(r1,c1).border = { top:thin, bottom:thin, left:thin, right:thin };
 }
 
-// 파렛트 적재 높이(약 155cm, 파렛트 자체 높이 15cm 제외) 안에서 박스를 쌓는다.
-// 같은 품목은 바닥(1,100×1,100mm)에 여러 개를 나란히 깔고, 그 위로 같은 자리에 계속 쌓아올리는 방식으로 추정한다.
-// 박스 규격이 없는 품목은 "박스규격 미확인" 상태로 중박스(300×300×300mm) 크기를 임시로 가정해서 계산한다
-// (그래야 수십 박스짜리 품목이 무조건 '1단'으로 잘못 표시되는 일이 없다). 실제 가로/세로 배치까지 정밀하게
-// 맞춘 계산은 아니고 어디까지나 "현장 참고용" 잠정 추정치다.
+// 파렛트 적재 높이(약 155cm, 파렛트 자체 높이 15cm 제외) 안에서 박스 높이를 순서대로 누적해
+// "몇 단째에 어떤 품목이 들어가는지"를 추정한다. 실제 가로/세로 배치까지 고려한 정밀 계산은 아니고,
+// 높이만 순차적으로 쌓는다고 가정한 "현장 참고용" 잠정 추정치다.
 const TIER_HEIGHT_BUDGET_MM = 1550;
-const PALLET_FLOOR_L_MM = 1100, PALLET_FLOOR_W_MM = 1100;
-const ASSUMED_BOX_DIMS_MM = { l:300, w:300, h:300 };
-
-// 밀크런 참고용/적재리스트/위킵 파일명에 센터명을 붙일지 여부 — 센터가 2개 이상 섞인 결과면
-// 파일명에 센터 하나만 적는 게 오히려 오해를 부르므로 생략한다.
-function centerLabelSuffix(rows){
-  const centers = [...new Set(rows.map(r=>r.center))];
-  return centers.length === 1 ? `-${centers[0]}` : '';
-}
-
 function computeTierGuide(pallet){
-  let tier = 1, usedHeight = 0;
+  let tier = 1, used = 0;
   const tiers = {};
   const noDims = [];
-  const addToTier = (t, key, count) => {
+  const addToTier = (t, name, count) => {
     if(!tiers[t]) tiers[t] = [];
-    const found = tiers[t].find(e => e.key === key);
-    if(found) found.count += count; else tiers[t].push({key, count});
+    const found = tiers[t].find(e => e.name === name);
+    if(found) found.count += count; else tiers[t].push({name, count});
   };
-
   pallet.items.forEach(it => {
-    let dims = (masterData.packing[it.skuId] || {}).boxDimsMm;
-    let assumed = false;
-    if(!dims || !dims.l || !dims.w || !dims.h){ dims = ASSUMED_BOX_DIMS_MM; assumed = true; noDims.push(it.itemName); }
-
-    // 이 품목의 박스가 파렛트 바닥에 한 단(층)에 몇 개나 나란히 놓이는지 — 가로/세로 두 방향 중 더 많이 들어가는 쪽으로 계산
-    const perLayerA = Math.floor(PALLET_FLOOR_L_MM/dims.l) * Math.floor(PALLET_FLOOR_W_MM/dims.w);
-    const perLayerB = Math.floor(PALLET_FLOOR_L_MM/dims.w) * Math.floor(PALLET_FLOOR_W_MM/dims.l);
-    const perLayer = Math.max(perLayerA, perLayerB, 1);
-    const label = assumed
-      ? `${it.itemName} (박스규격 미확인 — 300×300×300mm 가정, 한 단에 ${perLayer}개)`
-      : `${it.itemName} (한 단에 ${perLayer}개씩)`;
-
+    const dims = (masterData.packing[it.skuId] || {}).boxDimsMm;
+    if(!dims || !dims.h){
+      addToTier(tier, `${it.itemName} (박스높이 정보없음)`, it.boxQty);
+      noDims.push(it.itemName);
+      return;
+    }
     let remaining = it.boxQty;
     while(remaining > 0){
-      if(usedHeight + dims.h > TIER_HEIGHT_BUDGET_MM && usedHeight > 0){ tier++; usedHeight = 0; continue; }
-      const thisLayerQty = Math.min(perLayer, remaining);
-      addToTier(tier, label, thisLayerQty);
-      usedHeight += dims.h;
-      remaining -= thisLayerQty;
+      if(used + dims.h > TIER_HEIGHT_BUDGET_MM && used > 0){ tier++; used = 0; continue; }
+      used += dims.h;
+      addToTier(tier, it.itemName, 1);
+      remaining--;
     }
   });
-
-  const tiersOut = {};
-  Object.keys(tiers).forEach(t => { tiersOut[t] = tiers[t].map(e => ({ name: e.key, count: e.count })); });
-
-  return { tiers: tiersOut, maxTier: tier, noDims: [...new Set(noDims)] };
+  return { tiers, maxTier: tier, noDims };
 }
 
 async function downloadLoadingList(){
@@ -1621,14 +1562,9 @@ async function downloadLoadingList(){
       return lastContentRow;
     };
 
-    // 인쇄 설정: A4 세로, 여백 좁게, 가로는 1페이지에 강제로 맞춤(fitToPage 없이는 fitToWidth가 무시돼서
-    // 오른쪽이 잘려 2페이지로 나뉘던 문제의 원인이었음). 세로 방향은 자동(내용만큼 여러 페이지).
-    ws.pageSetup = {
-      paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0,
-      margins: { top:0.4, bottom:0.4, left:0.4, right:0.4, header:0, footer:0 }
-    };
+    // 인쇄 설정: A4 세로, 여백 좁게. 한 페이지에 들어갈 수 있는 높이(pt)를 넉넉히 보수적으로 잡는다.
+    ws.pageSetup = { paperSize: 9, orientation: 'portrait', margins: { top:0.4, bottom:0.4, left:0.4, right:0.4, header:0, footer:0 }, fitToWidth: 1, fitToHeight: 0 };
     const MAX_PAGE_HEIGHT_PT = 730;
-    const HALF_PAGE_HEIGHT_PT = MAX_PAGE_HEIGHT_PT / 2; // 사본 2장을 한 페이지에 넣을 때, 정확히 절반 지점에서 잘리도록
     const GAP_PT = FIXED_ROW_H.blank; // 같은 파렛트의 사본1↔사본2 사이 여백
 
     g.pallets.forEach((pallet, idx) => {
@@ -1639,20 +1575,10 @@ async function downloadLoadingList(){
       const twoUp = h*2 + GAP_PT <= MAX_PAGE_HEIGHT_PT;
 
       const end1 = addBlock(idx+1, g.pallets.length, pallet);
-      if(twoUp){
-        // 2장이 다닥다닥 붙지 않고, 위쪽 사본은 페이지 위쪽 절반에 / 아래쪽 사본은 정확히 페이지 절반
-        // 지점부터 시작하도록 그 사이 여백 행의 높이를 채워서 자르는 선이 페이지 정중앙에 오게 한다.
-        const fillerPt = Math.max(GAP_PT, HALF_PAGE_HEIGHT_PT - h - GAP_PT);
-        ws.getRow(end1+1).height = fillerPt;
-      } else {
-        ws.getRow(end1).addPageBreak();
-      }
+      if(!twoUp) ws.getRow(end1).addPageBreak();
       const end2 = addBlock(idx+1, g.pallets.length, pallet);
       ws.getRow(end2).addPageBreak();
     });
-
-    // 인쇄영역을 명시적으로 지정 — 지정하지 않으면 엑셀이 실제 사용범위를 잘못 잡아 열이 잘리는 경우가 있어서
-    ws.pageSetup.printArea = `A1:M${row-1}`;
 
     // --- 현장 참고용: 파렛트별 1단/2단/3단... 적재 단수 가이드 시트 ---
     const guideSheetName = `${sheetName} 참고`.slice(0, 31);
@@ -1707,7 +1633,7 @@ async function downloadLoadingList(){
     alert("⚠ 일부 SKU에 '박스 크기(mm)' 정보가 없어, 해당 품목은 중량 기준으로만 파렛트를 배정했습니다.\n(부피 초과 여부는 반영되지 않았을 수 있어요)\n제출 전 파렛트 수를 한 번 더 육안으로 확인해 주세요.");
   }
 
-  const fname2 = `쿠팡 파렛트 적재리스트_${lastResultMr.dk}_밀크런${centerLabelSuffix(lastResultMr.rows)}.xlsx`;
+  const fname2 = `쿠팡 파렛트 적재리스트_${lastResultMr.dk}_밀크런-${lastResultMr.center}.xlsx`;
   const buffer2 = await wb.xlsx.writeBuffer();
   const url2=URL.createObjectURL(new Blob([buffer2],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
   const link2=document.createElement('a');
@@ -1727,17 +1653,9 @@ const WEEKEEP_HEADER = [
 function buildWeekeepRows(lastResultMr){
   const rows = [];
   const unresolved = [];
-
-  // 센터+발송예정일 그룹별 파렛트 수 — 배송메세지(다산 배차 / 쿠팡 자동배정)에 사용
-  const palletMap = new Map();
-  (lastResultMr.loadingPlan || []).forEach(g => palletMap.set(`${g.dk}__${g.center}`, g.pallets.length));
-
   lastResultMr.rows.forEach(r => {
     const pack = masterData.packing[r.skuId];
     const compositions = (pack && pack.compositions && pack.compositions.length) ? pack.compositions : [r.itemName];
-    const palletCount = palletMap.get(`${r.dk}__${r.center}`) || 0;
-    // VF124는 다산물류에서 직접 배차, 그 외 센터는 쿠팡이 자동으로 차량을 배정
-    const deliveryMsg = `${palletCount}파렛트 / ${r.center === 'VF124' ? '다산에서 배차' : '쿠팡 자동 배정'}`;
 
     compositions.forEach(compText => {
       // 구성요소가 1개뿐인 단일상품이면 그 SKU 자기 자신의 바코드를 바로 사용, 세트면 구성텍스트로 재조회
@@ -1749,12 +1667,11 @@ function buildWeekeepRows(lastResultMr){
       }
 
       rows.push({
-        orderNo: `${String(r.eta||'').replace(/-/g,'').slice(2)}-${r.receiver}`, itemName: r.itemName,
+        orderNo: r.orderNo, itemName: r.itemName,
         weekeepSku: wk ? wk.skuNo : '',
         weekeepName: wk ? wk.name : compText, // 매칭 실패 시에도 육안 확인용으로 구성 텍스트는 채워둠
         qty: r.totalQty,
-        receiver: `${r.receiver}-밀크런`, phone: r.phone, phone2: r.phone2, zip: r.zip, addr: r.addr,
-        deliveryMsg,
+        receiver: r.receiver, phone: r.phone, phone2: r.phone2, zip: r.zip, addr: r.addr,
         sendDate: String(r.eta || '').replace(/-/g,'')
       });
     });
@@ -1780,7 +1697,7 @@ async function downloadResultWeekeepMilkrun(){
     aoa.push([
       r.orderNo, r.itemName, r.weekeepSku, r.weekeepName, '', '',
       r.qty, '', '', r.receiver, r.phone, r.phone2, r.zip, r.addr,
-      r.deliveryMsg, '', '', '', '', '', Number(r.sendDate) || r.sendDate
+      '', '', '', '', '', '', Number(r.sendDate) || r.sendDate
     ]);
   });
 
@@ -1792,10 +1709,10 @@ async function downloadResultWeekeepMilkrun(){
   ws.columns.forEach(col => { col.width = 16; });
 
   // E,F,H,I,O~T열은 삭제하지 않고 숨김 처리만 (엑셀 원본 열 구조는 유지)
-  const wkHiddenCols = [5,6,8,9,16,17,18,19,20]; // 1-based: E,F,H,I,P,Q,R,S,T (O열=배송메세지는 표시)
+  const wkHiddenCols = [5,6,8,9,15,16,17,18,19,20]; // 1-based: E,F,H,I,O,P,Q,R,S,T
   wkHiddenCols.forEach(c => { ws.getColumn(c).hidden = true; });
 
-  const fname = `위킵 업로드_밀크런${centerLabelSuffix(lastResultMr.rows)}_(${lastResultMr.dk}).xlsx`;
+  const fname = `위킵 업로드_밀크런-${lastResultMr.center}_(${lastResultMr.dk}).xlsx`;
   const buffer=await wb.xlsx.writeBuffer();
   const url=URL.createObjectURL(new Blob([buffer],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
   const link=document.createElement('a');
@@ -2019,10 +1936,12 @@ function detectDocType(filename, text){
 }
 
 function detectCenter(text){
-  const m = text.match(/주세요\s*([가-힣]{2,8}\d{1,3})\s*박스\s*\d+-\d+/);
+  // 쿠팡 물류센터명은 '대구3','인천30'처럼 숫자가 붙는 경우가 많지만, '호법'처럼 숫자 없는
+  // 센터명도 실제로 존재해서 숫자를 필수가 아니라 있어도 되고 없어도 되게(0~3자리) 바꿈.
+  const m = text.match(/주세요\s*([가-힣]{2,8}\d{0,3})\s*박스\s*\d+-\d+/);
   if(m) return m[1];
-  // 백업 패턴: '박스 N-M' 앞의 한글+숫자 토큰을 폭넓게 탐색
-  const m2 = text.match(/([가-힣]{2,8}\d{1,3})\s*박스\s*\d+-\d+/);
+  // 백업 패턴: '박스 N-M' 앞의 한글(+숫자) 토큰을 폭넓게 탐색
+  const m2 = text.match(/([가-힣]{2,8}\d{0,3})\s*박스\s*\d+-\d+/);
   return m2 ? m2[1] : null;
 }
 
