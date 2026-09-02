@@ -155,7 +155,7 @@
 <div class="wrap">
 
   <span class="tag">● Coupang Rocket 택배</span>
-  <h1>로켓배송 발주서 자동화 <span style="color:#8c9eff; font-weight:700; font-size:19px; margin-left:4px;">(v19)</span> <span style="font-size:12px; color:var(--sub); font-weight:400; margin-left:8px; letter-spacing:0;">최근 수정: 2026-09-04 (콤마서식 숫자 파싱 버그 수정 — 무게 0kg 원인, 센터별 소계 표 추가)</span></h1>
+  <h1>로켓배송 발주서 자동화 <span style="color:#8c9eff; font-weight:700; font-size:19px; margin-left:4px;">(v20)</span> <span style="font-size:12px; color:var(--sub); font-weight:400; margin-left:8px; letter-spacing:0;">최근 수정: 2026-09-04 (센터별 소계 정렬을 아래 상세표와 동일하게 맞춤)</span></h1>
   <p class="sub">로켓택배(쉽먼트)와 로켓 밀크런(용차) 발주서를 탭으로 나눠서 처리합니다. 마스터 데이터는 두 탭이 공용으로 사용합니다.</p>
 
   <!-- STEP 1: 마스터 데이터 -->
@@ -1280,12 +1280,14 @@ function renderResultMilkrun(){
   document.getElementById('mrPallets').textContent = totalPallets;
 
   // 센터별로 접수하는 경우가 많아서 총합만으로는 불편함 → 센터별(정확히는 발송예정일+센터 그룹별) 소계도 같이 보여준다
+  // loadingPlan은 buildLoadingPlan에서 Map으로 만들어서 rows에 처음 등장하는 순서를 그대로 유지하므로,
+  // 아래 물류센터별 상세 표와 정렬 순서를 맞추려면 별도로 정렬하지 않는다.
   const centerBreakdown = loadingPlan.map(g => {
     const groupRows = rows.filter(r => r.dk === g.dk && r.center === g.center);
     const gBox = groupRows.reduce((s,r)=>s+(Number(r.boxQty)||0),0);
     const gWeight = groupRows.reduce((s,r)=>s+(Number(r.totalQty)||0)*(Number(r.weightG)||0),0) / 1000;
     return { center: g.center, eta: g.eta, skuRows: groupRows.length, box: gBox, weight: gWeight, pallets: g.pallets.length };
-  }).sort((a,b) => a.center.localeCompare(b.center, 'ko'));
+  });
 
   const bdEl = document.getElementById('mrCenterBreakdown');
   if(centerBreakdown.length > 1){
