@@ -155,7 +155,7 @@
 <div class="wrap">
 
   <span class="tag">● Coupang Rocket 택배</span>
-  <h1>로켓배송 발주서 자동화 <span style="color:#8c9eff; font-weight:700; font-size:19px; margin-left:4px;">(v24)</span> <span style="font-size:12px; color:var(--sub); font-weight:400; margin-left:8px; letter-spacing:0;">최근 수정: 2026-09-04 (STEP2 PO_SKU_LIST CSV 업로드 지원 — 택배/밀크런 둘 다)</span></h1>
+  <h1>로켓배송 발주서 자동화 <span style="color:#8c9eff; font-weight:700; font-size:19px; margin-left:4px;">(v26)</span> <span style="font-size:12px; color:var(--sub); font-weight:400; margin-left:8px; letter-spacing:0;">최근 수정: 2026-09-04 (적재리스트 인쇄 시 2페이지로 쪼개지던 문제 수정 — 페이지 여백 기준 보수적으로 재조정)</span></h1>
   <p class="sub">로켓택배(쉽먼트)와 로켓 밀크런(용차) 발주서를 탭으로 나눠서 처리합니다. 마스터 데이터는 두 탭이 공용으로 사용합니다.</p>
 
   <!-- STEP 1: 마스터 데이터 -->
@@ -1188,18 +1188,21 @@ function buildLoadingPlan(rows){
     const g = groupMap[gk];
     if(!g.itemsBySku[r.skuId]){
       g.itemsBySku[r.skuId] = {
-        skuId: r.skuId, itemName: r.itemName, totalQty:0,
-        unitNum: (masterData.packing[r.skuId] || {}).unitNum ?? null,
+        skuId: r.skuId, itemName: r.itemName, totalQty:0, boxQty:0,
         weightG: r.weightG, boxDimsMm: r.boxDimsMm, orderNos: new Set()
       };
     }
     const it = g.itemsBySku[r.skuId];
     it.totalQty += Number(r.totalQty)||0;
+    // 참고용(3번) 화면에 이미 발주번호별로 올림 처리된 박스수량을 그대로 더한다.
+    // (합계 수량으로 다시 나눠서 계산하면 예: 8+22+46개를 76개로 합쳐 4박스로 줄어드는데,
+    //  실제로는 발주별로 이미 1+2+3=6박스가 나가있는 상태라 참고용과 숫자가 어긋나버림)
+    it.boxQty += Number(r.boxQty)||0;
     it.orderNos.add(String(r.orderNo));
   });
 
   return Object.values(groupMap).map(g => {
-    const items = Object.values(g.itemsBySku).map(it => ({ ...it, boxQty: computeBoxCount(it.totalQty, it.unitNum) }));
+    const items = Object.values(g.itemsBySku);
     const pallets = packPallets(items);
     return { dk: g.dk, eta: g.eta, center: g.center, pallets };
   });
@@ -1655,7 +1658,11 @@ async function downloadLoadingList(){
       paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0,
       margins: { top:0.4, bottom:0.4, left:0.4, right:0.4, header:0, footer:0 }
     };
-    const MAX_PAGE_HEIGHT_PT = 730;
+    ws.headerFooter = { oddHeader: '', oddFooter: '', differentFirst: false };
+    // 인쇄 시 2장으로 쪼개지는 문제: 이론상 A4 사용가능 높이(약 784pt)에 맞춰 계산했는데
+    // 실제 프린터/엑셀 환경에서는 여백이 조금 더 타이트하게 잡혀서 여유가 부족했다.
+    // 안전하게 여유를 훨씬 더 두고(약 20% 이상 마진) 재조정.
+    const MAX_PAGE_HEIGHT_PT = 600;
     const HALF_PAGE_HEIGHT_PT = MAX_PAGE_HEIGHT_PT / 2; // 사본 2장을 한 페이지에 넣을 때, 정확히 절반 지점에서 잘리도록
     const GAP_PT = FIXED_ROW_H.blank; // 같은 파렛트의 사본1↔사본2 사이 여백
 
