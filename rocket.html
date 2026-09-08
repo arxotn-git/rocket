@@ -155,7 +155,7 @@
 <div class="wrap">
 
   <span class="tag">● Coupang Rocket 택배</span>
-  <h1>로켓배송 발주서 자동화 <span style="color:#4f46e5; font-weight:700; font-size:19px; margin-left:4px;">(v37)</span> <span style="font-size:12px; color:var(--sub); font-weight:400; margin-left:8px; letter-spacing:0;">최근 수정: 2026-09-04 (참고시트 빈 B열 숨김 처리)</span></h1>
+  <h1>로켓배송 발주서 자동화 <span style="color:#4f46e5; font-weight:700; font-size:19px; margin-left:4px;">(v39)</span> <span style="font-size:12px; color:var(--sub); font-weight:400; margin-left:8px; letter-spacing:0;">최근 수정: 2026-09-04 (세트화 품목 공간계산: 낱개 치수 없어 묶음 치수로 추정 — 1파렛트로 정상화)</span></h1>
   <p class="sub">로켓택배(쉽먼트)와 로켓 밀크런(트럭) 발주서를 탭으로 나눠서 처리합니다. 마스터 데이터는 두 탭이 공용으로 사용합니다.</p>
 
   <!-- STEP 1: 마스터 데이터 -->
@@ -1258,14 +1258,16 @@ async function handlePoFileMilkrun(file){
       const unitNum = pack ? pack.unitNum : null;
       const remark = pack && pack.type && pack.type.replace(/\s/g,'') !== '박스' ? pack.type : '';
 
-      // '박스(세트화)' 포장은 택배로 나갈 때만 비용을 아끼려고 여러 개를 한 박스에 묶는 것이고,
-      // 실제로 포장 자체는 밀크런이어도 동일한 통합박스(예: 6개입)를 그대로 씁니다 — 포장을 다시
-      // 낱개로 뜯어서 담는 게 아니라, 그저 쿠팡 적재리스트 '박스수량' 칸에는 관례상 수량을 그대로
-      // 적는 것뿐입니다. 그래서 파렛트 부피/단수 계산은 반드시 실제 포장 단위(예: 7박스)로 해야 하고,
-      // 화면/적재리스트에 "표시"만 수량 그대로(예: 42) 합니다. 이 둘을 절대 같은 값으로 합치면 안 됩니다.
+      // '박스(세트화)' 품목: 실제로 파렛트에는 낱개 세트박스 42개가 그대로 올라간다(택배처럼 다시
+      // 묶는 게 아님 — 확인 완료). 다만 마스터파일 '박스크기'에는 낱개 박스 크기가 아니라 6개들이
+      // 묶음(택배용) 박스 크기(예: 520×370×420mm)만 기록돼 있고, 낱개 박스 크기는 아직 모른다.
+      // → 부피/공간 계산은 지금 가진 유일한 치수(묶음 크기)를 기준으로 "묶음 크기 단위 7개"로
+      //   추정할 수밖에 없다(42개 낱개 × (묶음부피÷6) = 7개 × 묶음부피 와 수학적으로 동일한 추정치).
+      //   화면에 보여주는 박스수량은 여전히 42(실제 개수, 업무 규칙)로 유지한다.
+      //   ※ 낱개 박스 실측 치수를 마스터파일에 추가하면 훨씬 정확해진다.
       const isCourierOnlyBoxSet = !!(pack && pack.type && pack.type.includes('박스') && pack.type.includes('세트화'));
-      const physicalBoxCount = computeBoxCount(qty, unitNum); // 실제 포장(부피 계산용) — 항상 실제 박스 단위로 계산
-      const boxCount = isCourierOnlyBoxSet ? qty : physicalBoxCount; // 화면/적재리스트 표시용 박스수량
+      const boxCount = isCourierOnlyBoxSet ? qty : computeBoxCount(qty, unitNum); // 화면/적재리스트 표시용 박스수량
+      const physicalBoxCount = computeBoxCount(qty, unitNum); // 부피/공간 계산용 — 가진 치수(묶음 단위) 기준 추정
       const weightG = pack ? (pack.weightG || 0) : 0;
       const palletUnitNum = pack ? pack.palletUnitNum : null;
       const boxDimsMm = pack ? pack.boxDimsMm : null;
@@ -1490,27 +1492,17 @@ function computeTierGuide(pallet){
     let assumed = false;
     if(!dims || !dims.l || !dims.w || !dims.h){ dims = ASSUMED_BOX_DIMS_MM; assumed = true; noDims.push(it.itemName); }
     const areaOne = dims.l * dims.w;
-    // 단수 가이드의 파렛트/단 배치(부피)는 실제 물리적 박스 개수(physicalBoxQty) 기준으로 펼쳐야 한다 —
-    // '박스(세트화)' 품목은 실제로는 통합박스(예: 6개입) 단위로 공간을 차지하기 때문.
+    // 단수 가이드의 공간 배치는 '가진 치수 단위'(세트화 품목은 묶음 크기) 기준 개수로 펼치되,
+    // 화면에 보여줄 개수(displayCount)는 그 공간단위 하나가 실제로 대표하는 낱개 수(예: 6개씩)를
+    // 비례 배분해서, 합계가 적재리스트 표시 박스수량(예: 42)과 일치하게 만든다.
     const physQty = it.physicalBoxQty != null ? it.physicalBoxQty : it.boxQty;
     const boxWeightG = physQty > 0 ? ((Number(it.weightG)||0) * (Number(it.totalQty)||0)) / physQty : (Number(it.weightG)||0);
-
-    // 다만 표시되는 "몇 박스"라는 숫자는 적재리스트와 똑같이 맞춰야 한다(예: 42) — 물리적 박스 하나(통합박스)를
-    // 펼치면 안에 든 낱개 수량만큼(예: 6개)으로 표시 카운트를 나눠서, 물리적 배치는 실제 부피대로 하되
-    // 화면 숫자는 적재리스트와 일치하게 만든다.
-    const isCourierOnlyBoxSet = !!(pack.type && pack.type.includes('박스') && pack.type.includes('세트화'));
-    let perBoxDisplay;
-    if(isCourierOnlyBoxSet && physQty > 0){
-      const unitPerBox = pack.unitNum || Math.ceil((Number(it.boxQty)||0) / physQty) || 1;
-      let remaining = Number(it.boxQty) || 0;
-      perBoxDisplay = [];
-      for(let i=0;i<physQty;i++){ const c = Math.min(unitPerBox, remaining); perBoxDisplay.push(c); remaining -= c; }
-    } else {
-      perBoxDisplay = new Array(physQty).fill(1);
-    }
-
+    const displayTotal = Number(it.boxQty) || 0;
+    let remaining = displayTotal;
     for(let i = 0; i < physQty; i++){
-      boxUnits.push({ itemName: it.itemName, area: areaOne, weight: boxWeightG, assumed, displayCount: perBoxDisplay[i] });
+      const share = i === physQty - 1 ? remaining : Math.round(displayTotal / physQty);
+      remaining -= share;
+      boxUnits.push({ itemName: it.itemName, area: areaOne, weight: boxWeightG, assumed, displayCount: share || 1 });
     }
   });
 
@@ -1743,20 +1735,17 @@ async function downloadLoadingList(){
     gws.getCell(grow,1).font = {name:'맑은 고딕', size:9, italic:true, color:{argb:'FF8ea2b4'}};
     grow += 1;
     gws.mergeCells(grow,1,grow,4);
-    gws.getCell(grow,1).value = "※ 여기 나오는 개수는 적재리스트의 박스수량과 동일합니다. 다만 '박스(세트화)' 품목은 실제로는 여러 개가 한 통합박스로 포장돼 쌓이므로(예: 42개 = 통합박스 7개), 파렛트/단수는 그 실제 통합박스 부피 기준으로 계산하고 화면 표시 개수만 적재리스트와 맞춰 나눠서 보여줍니다.";
+    gws.getCell(grow,1).value = "※ '박스(세트화)' 품목은 낱개 박스 실측 치수가 없어서, 마스터파일에 있는 묶음(택배용) 박스 치수로 공간을 추정했습니다. 낱개 치수를 등록하시면 더 정확해집니다.";
     gws.getCell(grow,1).font = {name:'맑은 고딕', size:9, italic:true, color:{argb:'FF8ea2b4'}};
     gws.getCell(grow,1).alignment = {wrapText:true, vertical:'top'};
-    gws.getRow(grow).height = 40;
-    grow += 2;
+    gws.getRow(grow).height = 26;
+    grow += 1;
 
     g.pallets.forEach((pallet, pIdx) => {
       const guide = computeTierGuide(pallet);
-      const displayBoxTotal = pallet.items.reduce((s,it)=>s+(Number(it.boxQty)||0),0);
-      const physicalBoxTotal = pallet.items.reduce((s,it)=>s+(Number(it.physicalBoxQty!=null?it.physicalBoxQty:it.boxQty)||0),0);
+      const boxTotal = pallet.items.reduce((s,it)=>s+(Number(it.boxQty)||0),0);
       gws.mergeCells(grow,1,grow,4);
-      gws.getCell(grow,1).value = displayBoxTotal !== physicalBoxTotal
-        ? `▶ 파렛트 ${pIdx+1} / ${g.pallets.length}  (총 ${guide.maxTier}단 예상 · 실제 물리적 박스 ${physicalBoxTotal}개 · 적재리스트 표시 박스수량 ${displayBoxTotal} BOX)`
-        : `▶ 파렛트 ${pIdx+1} / ${g.pallets.length}  (총 ${guide.maxTier}단 예상 · 박스 ${physicalBoxTotal}개)`;
+      gws.getCell(grow,1).value = `▶ 파렛트 ${pIdx+1} / ${g.pallets.length}  (총 ${guide.maxTier}단 예상 · 박스 ${boxTotal}개)`;
       gws.getCell(grow,1).fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF1A232D'}};
       gws.getCell(grow,1).font = {name:'맑은 고딕', size:12, bold:true, color:{argb:'FFFFFFFF'}};
       grow++;
