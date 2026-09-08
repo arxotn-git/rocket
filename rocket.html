@@ -155,7 +155,7 @@
 <div class="wrap">
 
   <span class="tag">● Coupang Rocket 택배</span>
-  <h1>로켓배송 발주서 자동화 <span style="color:#4f46e5; font-weight:700; font-size:19px; margin-left:4px;">(v28)</span> <span style="font-size:12px; color:var(--sub); font-weight:400; margin-left:8px; letter-spacing:0;">최근 수정: 2026-09-04 (라이트 테마로 전환, 밀크런 표기 '용차'→'트럭')</span></h1>
+  <h1>로켓배송 발주서 자동화 <span style="color:#4f46e5; font-weight:700; font-size:19px; margin-left:4px;">(v37)</span> <span style="font-size:12px; color:var(--sub); font-weight:400; margin-left:8px; letter-spacing:0;">최근 수정: 2026-09-04 (참고시트 빈 B열 숨김 처리)</span></h1>
   <p class="sub">로켓택배(쉽먼트)와 로켓 밀크런(트럭) 발주서를 탭으로 나눠서 처리합니다. 마스터 데이터는 두 탭이 공용으로 사용합니다.</p>
 
   <!-- STEP 1: 마스터 데이터 -->
@@ -1143,8 +1143,12 @@ function packPallets(items){
   const startNew = () => { cur = {weightKg:0, volumeM3:0, boxQty:0, items:[]}; pallets.push(cur); };
 
   items.forEach(it => {
+    // 부피는 반드시 '실제 물리적 박스 개수'(physicalBoxQty) 기준으로 계산해야 한다.
+    // 표시용 boxQty는 '박스(세트화)' 밀크런 예외 때문에 수량 그대로일 수 있어서(예: 42),
+    // 그 값으로 부피를 계산하면 실제로는 7박스인데 42박스인 것처럼 부풀려져 파렛트 수가 잘못 늘어난다.
+    const physQty = it.physicalBoxQty != null ? it.physicalBoxQty : it.boxQty;
     const itemWeightKg = (Number(it.totalQty)||0) * (Number(it.weightG)||0) / 1000;
-    const itemVolumeM3 = boxVolumeM3(it.boxDimsMm) * (Number(it.boxQty)||0);
+    const itemVolumeM3 = boxVolumeM3(it.boxDimsMm) * (Number(physQty)||0);
 
     if(itemWeightKg > PALLET_MAX_WEIGHT_KG || (itemVolumeM3 > 0 && itemVolumeM3 > PALLET_USABLE_VOLUME_M3)){
       // 이 품목 하나만으로 파렛트 1개를 초과 → 예외적으로 이 품목만 여러 파렛트에 분할
@@ -1152,16 +1156,17 @@ function packPallets(items){
         Math.ceil(itemWeightKg / PALLET_MAX_WEIGHT_KG) || 1,
         itemVolumeM3 > 0 ? Math.ceil(itemVolumeM3 / PALLET_USABLE_VOLUME_M3) : 1
       );
-      let remainingQty = it.totalQty, remainingBox = it.boxQty;
+      let remainingQty = it.totalQty, remainingBox = it.boxQty, remainingPhysBox = physQty;
       for(let s=0; s<splitBy; s++){
         startNew();
         const isLast = s === splitBy - 1;
         const qtyChunk = isLast ? remainingQty : Math.round(it.totalQty / splitBy);
         const boxChunk = isLast ? remainingBox : Math.round(it.boxQty / splitBy);
-        remainingQty -= qtyChunk; remainingBox -= boxChunk;
-        cur.items.push({ skuId: it.skuId, itemName: it.itemName, totalQty: qtyChunk, boxQty: boxChunk, orderNos: it.orderNos });
+        const physBoxChunk = isLast ? remainingPhysBox : Math.round(physQty / splitBy);
+        remainingQty -= qtyChunk; remainingBox -= boxChunk; remainingPhysBox -= physBoxChunk;
+        cur.items.push({ skuId: it.skuId, itemName: it.itemName, totalQty: qtyChunk, boxQty: boxChunk, physicalBoxQty: physBoxChunk, weightG: it.weightG, orderNos: it.orderNos });
         cur.weightKg += qtyChunk * (Number(it.weightG)||0) / 1000;
-        cur.volumeM3 += boxVolumeM3(it.boxDimsMm) * boxChunk;
+        cur.volumeM3 += boxVolumeM3(it.boxDimsMm) * physBoxChunk;
         cur.boxQty += boxChunk;
       }
       return;
@@ -1170,7 +1175,7 @@ function packPallets(items){
     if(!cur || (cur.weightKg + itemWeightKg > PALLET_MAX_WEIGHT_KG) || (itemVolumeM3 > 0 && cur.volumeM3 + itemVolumeM3 > PALLET_USABLE_VOLUME_M3)){
       startNew();
     }
-    cur.items.push({ skuId: it.skuId, itemName: it.itemName, totalQty: it.totalQty, boxQty: it.boxQty, orderNos: it.orderNos });
+    cur.items.push({ skuId: it.skuId, itemName: it.itemName, totalQty: it.totalQty, boxQty: it.boxQty, physicalBoxQty: it.physicalBoxQty, weightG: it.weightG, orderNos: it.orderNos });
     cur.weightKg += itemWeightKg;
     cur.volumeM3 += itemVolumeM3;
     cur.boxQty += it.boxQty;
@@ -1188,7 +1193,7 @@ function buildLoadingPlan(rows){
     const g = groupMap[gk];
     if(!g.itemsBySku[r.skuId]){
       g.itemsBySku[r.skuId] = {
-        skuId: r.skuId, itemName: r.itemName, totalQty:0, boxQty:0,
+        skuId: r.skuId, itemName: r.itemName, totalQty:0, boxQty:0, physicalBoxQty:0,
         weightG: r.weightG, boxDimsMm: r.boxDimsMm, orderNos: new Set()
       };
     }
@@ -1198,6 +1203,9 @@ function buildLoadingPlan(rows){
     // (합계 수량으로 다시 나눠서 계산하면 예: 8+22+46개를 76개로 합쳐 4박스로 줄어드는데,
     //  실제로는 발주별로 이미 1+2+3=6박스가 나가있는 상태라 참고용과 숫자가 어긋나버림)
     it.boxQty += Number(r.boxQty)||0;
+    // '박스(세트화)' 밀크런 예외로 표시용 박스수량(boxQty)은 수량 그대로 쓰더라도, 파렛트 부피
+    // 계산은 실제 물리적 박스 크기×개수를 써야 하므로 physicalBoxQty는 항상 별도로 정확히 누적한다.
+    it.physicalBoxQty += Number(r.physicalBoxQty != null ? r.physicalBoxQty : r.boxQty) || 0;
     it.orderNos.add(String(r.orderNo));
   });
 
@@ -1250,7 +1258,14 @@ async function handlePoFileMilkrun(file){
       const unitNum = pack ? pack.unitNum : null;
       const remark = pack && pack.type && pack.type.replace(/\s/g,'') !== '박스' ? pack.type : '';
 
-      const boxCount = computeBoxCount(qty, unitNum);
+      // '박스(세트화)' 포장은 택배로 나갈 때만 비용을 아끼려고 여러 개를 한 박스에 묶는 것이고,
+      // 실제로 포장 자체는 밀크런이어도 동일한 통합박스(예: 6개입)를 그대로 씁니다 — 포장을 다시
+      // 낱개로 뜯어서 담는 게 아니라, 그저 쿠팡 적재리스트 '박스수량' 칸에는 관례상 수량을 그대로
+      // 적는 것뿐입니다. 그래서 파렛트 부피/단수 계산은 반드시 실제 포장 단위(예: 7박스)로 해야 하고,
+      // 화면/적재리스트에 "표시"만 수량 그대로(예: 42) 합니다. 이 둘을 절대 같은 값으로 합치면 안 됩니다.
+      const isCourierOnlyBoxSet = !!(pack && pack.type && pack.type.includes('박스') && pack.type.includes('세트화'));
+      const physicalBoxCount = computeBoxCount(qty, unitNum); // 실제 포장(부피 계산용) — 항상 실제 박스 단위로 계산
+      const boxCount = isCourierOnlyBoxSet ? qty : physicalBoxCount; // 화면/적재리스트 표시용 박스수량
       const weightG = pack ? (pack.weightG || 0) : 0;
       const palletUnitNum = pack ? pack.palletUnitNum : null;
       const boxDimsMm = pack ? pack.boxDimsMm : null;
@@ -1260,7 +1275,7 @@ async function handlePoFileMilkrun(file){
       outRows.push({
         center: centerNameRaw, orderNo: r[cOrderNo], site:'쿠팡로켓배송', receiver: centerNameRaw,
         eta: etaDate, dk, phone: center.phone, phone2: center.phone, zip: center.zip, addr: center.addr,
-        itemName, boxQty: boxCount, skuId, totalQty: qty, unitStr, remark, weightG, palletUnitNum, boxDimsMm
+        itemName, boxQty: boxCount, physicalBoxQty: physicalBoxCount, skuId, totalQty: qty, unitStr, remark, weightG, palletUnitNum, boxDimsMm
       });
     }
 
@@ -1470,13 +1485,32 @@ function computeTierGuide(pallet){
   // 품목마다 박스 1개의 바닥 면적/무게를 구해서, 박스 1개 단위로 전부 펼쳐놓는다
   const boxUnits = [];
   pallet.items.forEach(it => {
-    let dims = (masterData.packing[it.skuId] || {}).boxDimsMm;
+    const pack = masterData.packing[it.skuId] || {};
+    let dims = pack.boxDimsMm;
     let assumed = false;
     if(!dims || !dims.l || !dims.w || !dims.h){ dims = ASSUMED_BOX_DIMS_MM; assumed = true; noDims.push(it.itemName); }
     const areaOne = dims.l * dims.w;
-    const boxWeightG = it.boxQty > 0 ? ((Number(it.weightG)||0) * (Number(it.totalQty)||0)) / it.boxQty : (Number(it.weightG)||0);
-    for(let i = 0; i < it.boxQty; i++){
-      boxUnits.push({ itemName: it.itemName, area: areaOne, weight: boxWeightG, assumed });
+    // 단수 가이드의 파렛트/단 배치(부피)는 실제 물리적 박스 개수(physicalBoxQty) 기준으로 펼쳐야 한다 —
+    // '박스(세트화)' 품목은 실제로는 통합박스(예: 6개입) 단위로 공간을 차지하기 때문.
+    const physQty = it.physicalBoxQty != null ? it.physicalBoxQty : it.boxQty;
+    const boxWeightG = physQty > 0 ? ((Number(it.weightG)||0) * (Number(it.totalQty)||0)) / physQty : (Number(it.weightG)||0);
+
+    // 다만 표시되는 "몇 박스"라는 숫자는 적재리스트와 똑같이 맞춰야 한다(예: 42) — 물리적 박스 하나(통합박스)를
+    // 펼치면 안에 든 낱개 수량만큼(예: 6개)으로 표시 카운트를 나눠서, 물리적 배치는 실제 부피대로 하되
+    // 화면 숫자는 적재리스트와 일치하게 만든다.
+    const isCourierOnlyBoxSet = !!(pack.type && pack.type.includes('박스') && pack.type.includes('세트화'));
+    let perBoxDisplay;
+    if(isCourierOnlyBoxSet && physQty > 0){
+      const unitPerBox = pack.unitNum || Math.ceil((Number(it.boxQty)||0) / physQty) || 1;
+      let remaining = Number(it.boxQty) || 0;
+      perBoxDisplay = [];
+      for(let i=0;i<physQty;i++){ const c = Math.min(unitPerBox, remaining); perBoxDisplay.push(c); remaining -= c; }
+    } else {
+      perBoxDisplay = new Array(physQty).fill(1);
+    }
+
+    for(let i = 0; i < physQty; i++){
+      boxUnits.push({ itemName: it.itemName, area: areaOne, weight: boxWeightG, assumed, displayCount: perBoxDisplay[i] });
     }
   });
 
@@ -1495,7 +1529,7 @@ function computeTierGuide(pallet){
     }
     target.remainingArea -= box.area;
     const cur = target.skus.get(box.itemName) || { count: 0, assumed: box.assumed };
-    cur.count += 1;
+    cur.count += box.displayCount;
     target.skus.set(box.itemName, cur);
   });
 
@@ -1696,6 +1730,7 @@ async function downloadLoadingList(){
     const gws = wb.addWorksheet(guideSheetName);
     gws.views = [{ showGridLines: false }];
     gws.getColumn(1).width = 4; gws.getColumn(2).width = 10; gws.getColumn(3).width = 46; gws.getColumn(4).width = 10;
+    gws.getColumn(2).hidden = true; // 사용하지 않는 빈 열이라 숨김 처리
 
     let grow = 1;
     gws.mergeCells(grow,1,grow,4);
@@ -1704,38 +1739,65 @@ async function downloadLoadingList(){
     gws.getCell(grow,1).alignment = {horizontal:'left', vertical:'center'};
     grow += 1;
     gws.mergeCells(grow,1,grow,4);
-    gws.getCell(grow,1).value = '※ 박스 높이만 순서대로 쌓는다고 가정한 잠정 추정치입니다. 실제 적재는 현장 여건(박스 형태 등)에 맞춰 조정해 주세요.';
+    gws.getCell(grow,1).value = '※ 박스 바닥면적/무게 기준으로 쌓는 순서를 가정한 잠정 추정치입니다. 실제 적재는 현장 여건(박스 형태 등)에 맞춰 조정해 주세요.';
     gws.getCell(grow,1).font = {name:'맑은 고딕', size:9, italic:true, color:{argb:'FF8ea2b4'}};
+    grow += 1;
+    gws.mergeCells(grow,1,grow,4);
+    gws.getCell(grow,1).value = "※ 여기 나오는 개수는 적재리스트의 박스수량과 동일합니다. 다만 '박스(세트화)' 품목은 실제로는 여러 개가 한 통합박스로 포장돼 쌓이므로(예: 42개 = 통합박스 7개), 파렛트/단수는 그 실제 통합박스 부피 기준으로 계산하고 화면 표시 개수만 적재리스트와 맞춰 나눠서 보여줍니다.";
+    gws.getCell(grow,1).font = {name:'맑은 고딕', size:9, italic:true, color:{argb:'FF8ea2b4'}};
+    gws.getCell(grow,1).alignment = {wrapText:true, vertical:'top'};
+    gws.getRow(grow).height = 40;
     grow += 2;
 
     g.pallets.forEach((pallet, pIdx) => {
       const guide = computeTierGuide(pallet);
+      const displayBoxTotal = pallet.items.reduce((s,it)=>s+(Number(it.boxQty)||0),0);
+      const physicalBoxTotal = pallet.items.reduce((s,it)=>s+(Number(it.physicalBoxQty!=null?it.physicalBoxQty:it.boxQty)||0),0);
       gws.mergeCells(grow,1,grow,4);
-      gws.getCell(grow,1).value = `▶ 파렛트 ${pIdx+1} / ${g.pallets.length}  (총 ${guide.maxTier}단 예상)`;
+      gws.getCell(grow,1).value = displayBoxTotal !== physicalBoxTotal
+        ? `▶ 파렛트 ${pIdx+1} / ${g.pallets.length}  (총 ${guide.maxTier}단 예상 · 실제 물리적 박스 ${physicalBoxTotal}개 · 적재리스트 표시 박스수량 ${displayBoxTotal} BOX)`
+        : `▶ 파렛트 ${pIdx+1} / ${g.pallets.length}  (총 ${guide.maxTier}단 예상 · 박스 ${physicalBoxTotal}개)`;
       gws.getCell(grow,1).fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF1A232D'}};
       gws.getCell(grow,1).font = {name:'맑은 고딕', size:12, bold:true, color:{argb:'FFFFFFFF'}};
       grow++;
 
-      for(let t = guide.maxTier; t >= 1; t--){ // 위쪽 단부터 보기 좋게 역순으로 표시 (시각적으로 쌓인 순서)
-        const entries = guide.tiers[t] || [];
-        if(!entries.length) continue;
-        const color = TIER_COLORS[(t-1) % TIER_COLORS.length];
-        const startRow = grow;
-        entries.forEach((e, ei) => {
-          gws.getCell(grow,1).value = ei===0 ? `${t}단` : '';
-          gws.getCell(grow,1).font = {name:'맑은 고딕', size:11, bold:true};
-          gws.getCell(grow,1).alignment = {horizontal:'center', vertical:'center'};
-          gws.getCell(grow,3).value = e.name;
-          gws.getCell(grow,4).value = `${e.count}박스`;
-          gws.getCell(grow,4).alignment = {horizontal:'center'};
-          for(let c=1;c<=4;c++){
-            gws.getCell(grow,c).fill = {type:'pattern', pattern:'solid', fgColor:{argb:color}};
-            gws.getCell(grow,c).border = {top:thin,bottom:thin,left:thin,right:thin};
-          }
-          grow++;
-        });
-        if(entries.length > 1) gws.mergeCells(startRow, 1, grow-1, 1);
+      // 같은 품목이 여러 단에 나뉘어 있으면 단 순서대로 흩어져 보이는 대신, 품목별로 나란히 묶어서 보여준다
+      // (몇 단인지는 줄마다 그대로 표시하므로 정보 손실은 없다).
+      const flatEntries = [];
+      for(let t = guide.maxTier; t >= 1; t--){
+        (guide.tiers[t] || []).forEach(e => flatEntries.push({ tier:t, name:e.name, count:e.count }));
       }
+      const groupOrder = [];
+      const groups = new Map();
+      flatEntries.forEach(e => {
+        if(!groups.has(e.name)){ groups.set(e.name, []); groupOrder.push(e.name); }
+        groups.get(e.name).push(e);
+      });
+      // 그룹 정렬 기준: 여러 단에 걸친 품목은 "가장 낮은(아래쪽) 단"을 기준으로 순서를 매긴다 —
+      // 그래야 1단까지 내려가는 품목(예: 멀티보드)이 자연스럽게 맨 아래쪽에 위치한다.
+      const groupMinTier = new Map();
+      groupOrder.forEach(name => {
+        groupMinTier.set(name, Math.min(...groups.get(name).map(e => e.tier)));
+      });
+      groupOrder.sort((a,b) => groupMinTier.get(b) - groupMinTier.get(a));
+
+      const orderedEntries = [];
+      groupOrder.forEach(name => orderedEntries.push(...groups.get(name)));
+
+      orderedEntries.forEach(e => {
+        const color = TIER_COLORS[(e.tier-1) % TIER_COLORS.length];
+        gws.getCell(grow,1).value = `${e.tier}단`;
+        gws.getCell(grow,1).font = {name:'맑은 고딕', size:11, bold:true};
+        gws.getCell(grow,1).alignment = {horizontal:'center', vertical:'center'};
+        gws.getCell(grow,3).value = e.name;
+        gws.getCell(grow,4).value = `${e.count}박스`;
+        gws.getCell(grow,4).alignment = {horizontal:'center'};
+        for(let c=1;c<=4;c++){
+          gws.getCell(grow,c).fill = {type:'pattern', pattern:'solid', fgColor:{argb:color}};
+          gws.getCell(grow,c).border = {top:thin,bottom:thin,left:thin,right:thin};
+        }
+        grow++;
+      });
       grow++;
     });
   });
