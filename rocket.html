@@ -155,7 +155,7 @@
 <div class="wrap">
 
   <span class="tag">● Coupang Rocket 택배</span>
-  <h1>로켓배송 발주서 자동화 <span style="color:#4f46e5; font-weight:700; font-size:19px; margin-left:4px;">(v41)</span> <span style="font-size:12px; color:var(--sub); font-weight:400; margin-left:8px; letter-spacing:0;">최근 수정: 2026-09-09 (센터명에 괄호 표기 있으면 택배 접수불가 가능성 경고 — 여주3(RC) 사례 반영)</span></h1>
+  <h1>로켓배송 발주서 자동화 <span style="color:#4f46e5; font-weight:700; font-size:19px; margin-left:4px;">(v42)</span> <span style="font-size:12px; color:var(--sub); font-weight:400; margin-left:8px; letter-spacing:0;">최근 수정: 2026-09-09 (쉽먼트 업로드 실패 진짜 원인 수정 — 비고열 빈문자열→null, 위킵명칭매칭 공백무시)</span></h1>
   <p class="sub">로켓택배(쉽먼트)와 로켓 밀크런(트럭) 발주서를 탭으로 나눠서 처리합니다. 마스터 데이터는 두 탭이 공용으로 사용합니다.</p>
 
   <!-- STEP 1: 마스터 데이터 -->
@@ -800,6 +800,9 @@ async function handleMasterFile(file){
     // + 상품관리명(구성 텍스트와 표기가 동일한 경우가 많음) → 위킵 SKU번호 직접 매칭용도 같이 만들어둔다.
     // 세트상품의 구성요소가 포장정보 시트에는 자기 바코드가 없는(단독 상품으로 안 팔린) 경우가 있어서,
     // 바코드 경유 매칭이 실패해도 상품관리명이 정확히 일치하면 여기서 바로 잡아낼 수 있다.
+    // 이름 매칭이 공백 유무나 대소문자 차이 때문에 실패하지 않도록 정규화(공백 전부 제거 + 소문자화)해서 비교한다.
+    const normKey = s => String(s||'').replace(/\s+/g,'').toLowerCase();
+
     const weekeepByBarcode = {};
     const weekeepByName = {};
     if(weekeepSheetName){
@@ -814,7 +817,7 @@ async function handleMasterFile(file){
         const skuNo = r2[10] != null ? String(r2[10]).trim() : '';
         const entry = { skuNo, name };
         if(barcode) weekeepByBarcode[barcode] = entry;
-        if(name) weekeepByName[name] = entry;
+        if(name) weekeepByName[normKey(name)] = entry;
       }
     }
 
@@ -1852,8 +1855,8 @@ function buildWeekeepRows(lastResultMr){
     const deliveryMsg = `${palletCount}파렛트 / ${r.center === 'VF124' ? '다산에서 배차' : '쿠팡 자동 배정'}`;
 
     compositions.forEach(compText => {
-      // 1순위: 위킵상품정보의 상품관리명이 구성 텍스트와 정확히 일치하면 그걸로 바로 매칭 (가장 확실함)
-      let wk = (masterData.weekeepByName || {})[compText] || null;
+      // 1순위: 위킵상품정보의 상품관리명이 구성 텍스트와 일치하면 그걸로 바로 매칭 (공백/대소문자 차이는 무시)
+      let wk = (masterData.weekeepByName || {})[String(compText||'').replace(/\s+/g,'').toLowerCase()] || null;
       let barcode = null;
 
       if(!wk){
@@ -2066,7 +2069,12 @@ async function downloadShipment(){
     ws.addRow([
       Number(r.orderNo), r.centerNameRaw, '쉽먼트', Number(r.eddFull), Number(r.skuId),
       r.barcode ? Number(r.barcode) : r.barcode, r.skuName, Number(r.totalQty), Number(r.invoiceNo), Number(r.boxQty),
-      r.isDup ? `⚠ 중복 - 이전 생성 ${r.prevExportCount}회 (최근 ${r.prevExportedAt ? new Date(r.prevExportedAt).toLocaleString('ko-KR') : ''})` : ''
+      // 중복이 아니면 빈 문자열('')이 아니라 null을 넣어서 완전히 빈 셀로 만든다.
+      // 빈 문자열을 넣으면 그 셀이 '문자열 타입'으로 저장되는데, 실제로 사용자가 겪은 업로드 실패 파일과
+      // 성공 파일을 셀 단위로 직접 비교해보니 이 컬럼이 ''(문자열)냐 완전히 빈 값(null)이냐가 유일한
+      // 차이였다 — 즉 쿠팡 쉽먼트 업로드 검증기가 이 여분 컬럼에 문자열 타입 셀이 있으면 거부하는 것으로
+      // 보인다. null이면 엑셀 상 완전히 빈 셀(타입 없음)로 저장되어 문제가 없다.
+      r.isDup ? `⚠ 중복 - 이전 생성 ${r.prevExportCount}회 (최근 ${r.prevExportedAt ? new Date(r.prevExportedAt).toLocaleString('ko-KR') : ''})` : null
     ]);
   });
 
