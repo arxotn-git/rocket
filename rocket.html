@@ -155,7 +155,7 @@
 <div class="wrap">
 
   <span class="tag">● Coupang Rocket 택배</span>
-  <h1>로켓배송 발주서 자동화 <span style="color:#4f46e5; font-weight:700; font-size:19px; margin-left:4px;">(v39)</span> <span style="font-size:12px; color:var(--sub); font-weight:400; margin-left:8px; letter-spacing:0;">최근 수정: 2026-09-04 (세트화 품목 공간계산: 낱개 치수 없어 묶음 치수로 추정 — 1파렛트로 정상화)</span></h1>
+  <h1>로켓배송 발주서 자동화 <span style="color:#4f46e5; font-weight:700; font-size:19px; margin-left:4px;">(v41)</span> <span style="font-size:12px; color:var(--sub); font-weight:400; margin-left:8px; letter-spacing:0;">최근 수정: 2026-09-09 (센터명에 괄호 표기 있으면 택배 접수불가 가능성 경고 — 여주3(RC) 사례 반영)</span></h1>
   <p class="sub">로켓택배(쉽먼트)와 로켓 밀크런(트럭) 발주서를 탭으로 나눠서 처리합니다. 마스터 데이터는 두 탭이 공용으로 사용합니다.</p>
 
   <!-- STEP 1: 마스터 데이터 -->
@@ -630,6 +630,16 @@ function sheetRows(wb, name){
   return window.XLSX.utils.sheet_to_json(sh, {header:1, defval:null, raw:false});
 }
 
+// raw:false는 엑셀 셀의 "화면 표시 서식"을 그대로 문자열로 반환한다. 바코드처럼 자릿수가 큰 숫자가
+// 셀 서식이 지수표기(예: 8.80928E+12)로 돼 있으면, 뒷자리가 통째로 잘려나간 문자열을 받게 돼서
+// 그 값으로 Number() 변환을 하면 실제 바코드와 다른 숫자가 나온다(쉽먼트 업로드 거절의 원인이 될 수 있음).
+// 이 함수는 서식을 무시하고 셀에 저장된 진짜 숫자 값을 그대로 가져온다.
+function sheetRowsRaw(wb, name){
+  const sh = wb.Sheets[name];
+  if(!sh) return null;
+  return window.XLSX.utils.sheet_to_json(sh, {header:1, defval:null, raw:true});
+}
+
 // sheetRows가 raw:false로 읽기 때문에, 셀 서식이 "#,##0"처럼 천단위 콤마 표시로 돼 있으면
 // 값이 "1,150" 같은 문자열로 넘어와서 Number()가 NaN을 반환해버린다(무게 0.0 버그의 원인).
 // 숫자 파싱은 전부 이 함수를 거쳐서 콤마를 먼저 제거한다.
@@ -656,7 +666,9 @@ async function handleMasterFile(file){
       return;
     }
     const prodRows = sheetRows(wb, prodSheetName); 
+    const prodRowsRaw = sheetRowsRaw(wb, prodSheetName); // 바코드 지수표기 손실 방지용
     const packRows = sheetRows(wb, packSheetName); 
+    const packRowsRaw = sheetRowsRaw(wb, packSheetName); // 바코드 지수표기 손실 방지용
 
     const products = {}; 
     const centers = {};  
@@ -664,10 +676,14 @@ async function handleMasterFile(file){
       const r = prodRows[i]; if(!r) continue;
       const skuId = r[0];
       if(skuId !== null && skuId !== '' && r[2]){
+        // 바코드는 raw:true로 읽은 원본 숫자값을 우선 사용 — 셀 서식이 지수표기(예: 8.80928E+12)여도
+        // 문자열이 잘리지 않은 정확한 정수 그대로 가져온다. raw 값이 없을 때만 기존 방식으로 폴백.
+        const rawR = prodRowsRaw && prodRowsRaw[i];
+        const rawBarcode = rawR && rawR[5] != null ? rawR[5] : null;
         products[String(skuId).trim()] = {
           name: String(r[2]).trim(),                                  // C열 상품명 (참고용 파일 품목명용)
           coupangName: r[1] != null ? String(r[1]).trim() : '',        // B열 쿠팡상품명 (쉽먼트 업로드 SKU Name용)
-          barcode: r[5] != null ? String(r[5]).trim() : ''             // F열 바코드 (쉽먼트 업로드 SKU Barcode용)
+          barcode: rawBarcode != null ? String(rawBarcode).trim() : (r[5] != null ? String(r[5]).trim() : '') // F열 바코드 (쉽먼트 업로드 SKU Barcode용)
         };
       }
       const centerName = r[8]; 
@@ -732,7 +748,8 @@ async function handleMasterFile(file){
         }
         pk++;
       }
-      const ownBarcode = r[2] != null ? String(r[2]).trim() : '';
+      const rawOwnBarcode = packRowsRaw && packRowsRaw[pi] && packRowsRaw[pi][2] != null ? packRowsRaw[pi][2] : null;
+      const ownBarcode = rawOwnBarcode != null ? String(rawOwnBarcode).trim() : (r[2] != null ? String(r[2]).trim() : '');
 
       // 박스 이름/박스 크기(mm, "가로*세로*높이") — 파렛트 적재리스트 계산용.
       // 무게와 마찬가지로 세트상품은 SKU 행 자체가 아니라 하위 구성 행에 적혀있을 수 있어서
@@ -780,21 +797,28 @@ async function handleMasterFile(file){
     });
 
     // 위킵상품정보 시트(선택) — 고객사바코드 → 위킵 SKU번호/상품관리명 매칭용
+    // + 상품관리명(구성 텍스트와 표기가 동일한 경우가 많음) → 위킵 SKU번호 직접 매칭용도 같이 만들어둔다.
+    // 세트상품의 구성요소가 포장정보 시트에는 자기 바코드가 없는(단독 상품으로 안 팔린) 경우가 있어서,
+    // 바코드 경유 매칭이 실패해도 상품관리명이 정확히 일치하면 여기서 바로 잡아낼 수 있다.
     const weekeepByBarcode = {};
+    const weekeepByName = {};
     if(weekeepSheetName){
       const wkRows = sheetRows(wb, weekeepSheetName);
+      const wkRowsRaw = sheetRowsRaw(wb, weekeepSheetName); // 바코드 지수표기 손실 방지용
       for(let i=1; i<wkRows.length; i++){
         const r2 = wkRows[i]; if(!r2) continue;
-        const barcode = r2[19] != null ? String(r2[19]).trim() : '';
-        if(!barcode) continue;
-        weekeepByBarcode[barcode] = {
-          skuNo: r2[10] != null ? String(r2[10]).trim() : '',
-          name: r2[9] != null ? String(r2[9]).trim() : ''
-        };
+        const rawR2 = wkRowsRaw && wkRowsRaw[i];
+        const rawBarcode2 = rawR2 && rawR2[19] != null ? rawR2[19] : null;
+        const barcode = rawBarcode2 != null ? String(rawBarcode2).trim() : (r2[19] != null ? String(r2[19]).trim() : '');
+        const name = r2[9] != null ? String(r2[9]).trim() : '';
+        const skuNo = r2[10] != null ? String(r2[10]).trim() : '';
+        const entry = { skuNo, name };
+        if(barcode) weekeepByBarcode[barcode] = entry;
+        if(name) weekeepByName[name] = entry;
       }
     }
 
-    masterData = { products, centers, packing, compositionBarcode, weekeepByBarcode, updatedAt: Date.now() };
+    masterData = { products, centers, packing, compositionBarcode, weekeepByBarcode, weekeepByName, updatedAt: Date.now() };
     
     // 1. 계산용 JSON 데이터 최신화
     await setDoc(doc(db, "rocket_data", "master"), masterData);
@@ -1828,9 +1852,16 @@ function buildWeekeepRows(lastResultMr){
     const deliveryMsg = `${palletCount}파렛트 / ${r.center === 'VF124' ? '다산에서 배차' : '쿠팡 자동 배정'}`;
 
     compositions.forEach(compText => {
-      // 구성요소가 1개뿐인 단일상품이면 그 SKU 자기 자신의 바코드를 바로 사용, 세트면 구성텍스트로 재조회
-      let barcode = (compositions.length === 1 && pack && pack.barcode) ? pack.barcode : (masterData.compositionBarcode || {})[compText];
-      const wk = barcode ? (masterData.weekeepByBarcode || {})[barcode] : null;
+      // 1순위: 위킵상품정보의 상품관리명이 구성 텍스트와 정확히 일치하면 그걸로 바로 매칭 (가장 확실함)
+      let wk = (masterData.weekeepByName || {})[compText] || null;
+      let barcode = null;
+
+      if(!wk){
+        // 2순위: 바코드 경유 매칭 — 구성요소가 1개뿐인 단일상품이면 그 SKU 자기 자신의 바코드를 바로 사용,
+        // 세트면 포장정보 시트에서 같은 구성텍스트를 가진 단독상품의 바코드를 재조회
+        barcode = (compositions.length === 1 && pack && pack.barcode) ? pack.barcode : (masterData.compositionBarcode || {})[compText];
+        wk = barcode ? (masterData.weekeepByBarcode || {})[barcode] : null;
+      }
 
       if(!wk){
         unresolved.push(`${r.itemName} — 구성 "${compText}" (바코드 ${barcode || '미확인'})`);
@@ -1972,12 +2003,19 @@ function renderInvoiceResult(){
 
   const warnArea = document.getElementById('invoiceWarnArea');
   warnArea.innerHTML = '';
-  if(unmatched.length || missingMaster.length){
+  // '여주3(RC)'처럼 센터명에 괄호 표기가 붙은 경우, 실제로 택배(쉽먼트) 접수 자체가 안 되는 센터일 수 있다
+  // (과거 '여주3(RC)'에서 "택배로 접수할 수 없는 센터" 오류가 실제로 발생한 적 있음) — 미리 눈에 띄게 표시.
+  const rcRows = shipRows.filter(r => /\([^)]+\)/.test(r.centerNameRaw));
+  if(unmatched.length || missingMaster.length || rcRows.length){
     const box = document.createElement('div');
     box.className = 'warn-box';
     let html = '<div class="h">⚠ 확인이 필요합니다</div><ul>';
     unmatched.forEach(u => html += `<li>물류센터 라벨 <span class="miss">${u.label}</span> (송장번호 ${u.invoiceNo}) — 클라우드 DB에서 박스 데이터를 찾지 못했습니다. 참고용 엑셀을 먼저 만들었는지, 라벨이 정확한지 확인해 주세요.</li>`);
     if(missingMaster.length) html += `<li>SKU 바코드/쿠팡상품명이 비어있는 상품이 ${missingMaster.length}건 있습니다 — 마스터 데이터를 최신 파일로 다시 업로드해 주세요.</li>`;
+    if(rcRows.length){
+      const rcCenters = [...new Set(rcRows.map(r=>r.centerNameRaw))];
+      html += `<li><b>센터명에 괄호가 붙은 곳(${rcCenters.join(', ')})</b>은 쿠팡에서 택배(쉽먼트) 접수 자체가 안 되는 센터일 수 있습니다 — 다운로드 전에 해당 건은 밀크런으로 처리해야 하는 건 아닌지 꼭 확인해 주세요.</li>`;
+    }
     html += '</ul>';
     box.innerHTML = html;
     warnArea.appendChild(box);
@@ -1988,11 +2026,12 @@ function renderInvoiceResult(){
   shipRows.forEach(r => {
     const tr = document.createElement('tr');
     if(r.isDup) tr.classList.add('over-limit');
+    const isRC = /\([^)]+\)/.test(r.centerNameRaw);
     const dupText = r.isDup ? `⚠ 중복 (이전 생성 ${r.prevExportCount}회, 최근 ${r.prevExportedAt ? new Date(r.prevExportedAt).toLocaleString('ko-KR') : ''})` : '';
     tr.innerHTML = `
       <td class="center-label">${r.label}</td>
       <td>${r.orderNo}</td>
-      <td>${r.centerNameRaw}</td>
+      <td>${r.centerNameRaw}${isRC ? ' <span class="pill" style="background:rgba(255,176,32,.18);color:var(--amber);">택배 접수 확인필요</span>' : ''}</td>
       <td>${r.skuName}</td>
       <td>${r.totalQty}</td>
       <td>${r.boxQty}</td>
@@ -2010,6 +2049,13 @@ function renderInvoiceResult(){
 async function downloadShipment(){
   if(!lastInvoiceResult || !lastInvoiceResult.shipRows.length) return;
   const { shipRows } = lastInvoiceResult;
+
+  const rcCenters = [...new Set(shipRows.filter(r => /\([^)]+\)/.test(r.centerNameRaw)).map(r=>r.centerNameRaw))];
+  if(rcCenters.length){
+    const ok = confirm(`⚠ ${rcCenters.join(', ')} 센터는 택배(쉽먼트) 접수가 안 될 수 있습니다.\n(과거 '여주3(RC)'에서 실제로 "택배로 접수할 수 없는 센터" 오류가 발생한 적이 있습니다)\n\n그래도 포함해서 다운로드할까요?\n[취소]를 누르면 다운로드하지 않습니다 — 밀크런으로 처리해야 하는 건 아닌지 먼저 확인해 주세요.`);
+    if(!ok) return;
+  }
+
   const SHIP_HEADER = ['발주번호(PO ID)','물류센터(FC)','입고유형(Transport Type)','입고예정일(EDD)','상품번호(SKU ID)',
     '상품바코드(SKU Barcode)','상품이름(SKU Name)','확정수량(Confirmed Qty)','송장번호(Invoice Number)','납품수량(Shipped Qty)','비고(중복확인)'];
 
@@ -2107,12 +2153,13 @@ function detectDocType(filename, text){
 }
 
 function detectCenter(text){
-  // 쿠팡 물류센터명은 '대구3','인천30'처럼 숫자가 붙는 경우가 많지만, '호법'처럼 숫자 없는
-  // 센터명도 실제로 존재해서 숫자를 필수가 아니라 있어도 되고 없어도 되게(0~3자리) 바꿈.
-  const m = text.match(/주세요\s*([가-힣]{2,8}\d{0,3})\s*박스\s*\d+-\d+/);
+  // 쿠팡 물류센터명은 '대구3','인천30'처럼 한글+숫자가 많지만, 'MGMH5'처럼 영문+숫자,
+  // '호법'처럼 숫자 없는 순한글 센터명도 실제로 존재한다. 한글/영문/숫자 어떤 조합이든
+  // 잡아내도록 문자셋을 넓힌다.
+  const m = text.match(/주세요\s*([A-Za-z가-힣0-9]{2,10})\s*박스\s*\d+-\d+/);
   if(m) return m[1];
-  // 백업 패턴: '박스 N-M' 앞의 한글(+숫자) 토큰을 폭넓게 탐색
-  const m2 = text.match(/([가-힣]{2,8}\d{0,3})\s*박스\s*\d+-\d+/);
+  // 백업 패턴: '박스 N-M' 앞의 토큰을 폭넓게 탐색
+  const m2 = text.match(/([A-Za-z가-힣0-9]{2,10})\s*박스\s*\d+-\d+/);
   return m2 ? m2[1] : null;
 }
 
