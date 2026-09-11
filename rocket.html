@@ -155,7 +155,7 @@
 <div class="wrap">
 
   <span class="tag">● Coupang Rocket 택배</span>
-  <h1>로켓배송 발주서 자동화 <span style="color:#4f46e5; font-weight:700; font-size:19px; margin-left:4px;">(v42)</span> <span style="font-size:12px; color:var(--sub); font-weight:400; margin-left:8px; letter-spacing:0;">최근 수정: 2026-09-09 (쉽먼트 업로드 실패 진짜 원인 수정 — 비고열 빈문자열→null, 위킵명칭매칭 공백무시)</span></h1>
+  <h1>로켓배송 발주서 자동화 <span style="color:#4f46e5; font-weight:700; font-size:19px; margin-left:4px;">(v44)</span> <span style="font-size:12px; color:var(--sub); font-weight:400; margin-left:8px; letter-spacing:0;">최근 수정: 2026-09-09 (안심클레이 10종팩 파렛트당 480개 현장수치 고정, 분할 시 균등분배)</span></h1>
   <p class="sub">로켓택배(쉽먼트)와 로켓 밀크런(트럭) 발주서를 탭으로 나눠서 처리합니다. 마스터 데이터는 두 탭이 공용으로 사용합니다.</p>
 
   <!-- STEP 1: 마스터 데이터 -->
@@ -1154,7 +1154,18 @@ function computeBoxCount(total, unit){
 // ⚠ 아래 부피 계산은 박스가 완전히 밀착 적재된다는 가정의 "잠정 추정치"이며, 실제 박스 형태/적재 방식에 따라
 //    오차가 있을 수 있습니다. 최종 제출 전 반드시 육안으로 파렛트 수를 한 번 더 확인해 주세요.
 const PALLET_MAX_WEIGHT_KG = 1000;
-const PALLET_USABLE_VOLUME_M3 = 1.1 * 1.1 * (1.7 - 0.15); // 파렛트 자체 높이(약150mm) 제외한 순수 적재 가능 부피 상한
+// 파렛트 자체 높이(약150mm) 제외한 순수 적재 가능 부피에, 박스가 100% 빈틈없이 채워지지 않는 현실을
+// 반영해 적재효율(85%)을 곱한다. 현장 참고가이드(단수 계산)에서는 이미 이 효율을 쓰고 있었는데,
+// 파렛트 개수를 정하는 여기서는 반영이 안 돼 있어서 실제보다 더 많이 들어가는 것처럼 계산되고 있었다
+// (예: 안심클레이 10종팩 53박스=636개가 1파렛트에 들어간다고 나왔지만, 현장에서는 480개가 한계라고 함).
+const PALLET_PACKING_EFFICIENCY = 0.85;
+const PALLET_USABLE_VOLUME_M3 = 1.1 * 1.1 * (1.7 - 0.15) * PALLET_PACKING_EFFICIENCY;
+
+// 현장에서 실측/확인된 "SKU별 1파렛트 최대 적재수량" — 박스크기 기반 부피 계산보다 우선 적용한다.
+// (요미몬 안심클레이 10종팩: 현장 확인 결과 1파렛트에 480개까지, 481개부터는 2파렛트로 분할)
+const PALLET_UNIT_OVERRIDE = {
+  '53725517': 480
+};
 
 function boxVolumeM3(dims){
   if(!dims) return 0;
@@ -1176,12 +1187,16 @@ function packPallets(items){
     const physQty = it.physicalBoxQty != null ? it.physicalBoxQty : it.boxQty;
     const itemWeightKg = (Number(it.totalQty)||0) * (Number(it.weightG)||0) / 1000;
     const itemVolumeM3 = boxVolumeM3(it.boxDimsMm) * (Number(physQty)||0);
+    const unitCap = PALLET_UNIT_OVERRIDE[it.skuId];
+    const overCap = !!(unitCap && (Number(it.totalQty)||0) > unitCap);
 
-    if(itemWeightKg > PALLET_MAX_WEIGHT_KG || (itemVolumeM3 > 0 && itemVolumeM3 > PALLET_USABLE_VOLUME_M3)){
+    if(itemWeightKg > PALLET_MAX_WEIGHT_KG || (itemVolumeM3 > 0 && itemVolumeM3 > PALLET_USABLE_VOLUME_M3) || overCap){
       // 이 품목 하나만으로 파렛트 1개를 초과 → 예외적으로 이 품목만 여러 파렛트에 분할
+      // (반반 나누기: 마지막 조각만 나머지를 받고, 나머지는 균등하게 나눠서 특정 파렛트에 몰리지 않게 한다)
       const splitBy = Math.max(
         Math.ceil(itemWeightKg / PALLET_MAX_WEIGHT_KG) || 1,
-        itemVolumeM3 > 0 ? Math.ceil(itemVolumeM3 / PALLET_USABLE_VOLUME_M3) : 1
+        itemVolumeM3 > 0 ? Math.ceil(itemVolumeM3 / PALLET_USABLE_VOLUME_M3) : 1,
+        overCap ? Math.ceil((Number(it.totalQty)||0) / unitCap) : 1
       );
       let remainingQty = it.totalQty, remainingBox = it.boxQty, remainingPhysBox = physQty;
       for(let s=0; s<splitBy; s++){
